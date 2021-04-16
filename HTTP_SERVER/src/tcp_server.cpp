@@ -1,19 +1,25 @@
 #undef UNICODE
 
 #define WIN32_LEAN_AND_MEAN
-#include <array>
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <array>
 #include <string>
 #include <vector>
+#include <direct.h>
+#include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-// Need to link with lws2_32 aka Ws2_32.lib
+#ifdef _DEBUG
+const char* server_init_file = "..\\server_options.ini";
+#else
+const char* server_init_file = ".\\server_options.ini";
+#endif
 
+// Need to link with lws2_32 aka Ws2_32.lib
 #define DEFAULT_BUFLEN 1024
-#define DEFAULT_PORT "80"
 
 // connection variable
 WSADATA wsaData;
@@ -29,9 +35,11 @@ int iSendResult;
 char recvbuf[DEFAULT_BUFLEN];
 int recvbuflen = DEFAULT_BUFLEN;
 
-// logic variable
-std::string baseDir;
-
+// variables for the logic
+std::string baseDir = "./";
+std::string localIp = "127.0.0.1";
+std::string default_IP = "0.0.0.0";
+std::string PORT = "80";
 std::map<std::string, std::string> Contents;
 
 void checkError(std::string type) {
@@ -42,11 +50,11 @@ void checkError(std::string type) {
 	}
 }
 
-std::string filetype(const std::string source, const std::string find) {
+std::vector<std::string> split(const std::string source, const std::string find) {
 	std::vector<std::string> res;
 	std::string haystack(source);
 
-	int pos = 0;
+	size_t pos = 0;
 	std::string token;
 	while ((pos = haystack.find(find)) != std::string::npos) {
 		token = haystack.substr(0, pos);
@@ -55,7 +63,7 @@ std::string filetype(const std::string source, const std::string find) {
 	}
 	res.insert(res.end(), haystack);
 
-	return res.back();
+	return res;
 }
 
 void initTypes();
@@ -68,27 +76,13 @@ std::string compileHeader(std::vector<std::array<std::string, 2>> hOptions);
 void compileMessage(const char* request, std::string& message);
 void urldecode2(char* dst, const char* src);
 
-int __cdecl main(int argc, char** argv) {
+int __cdecl main() {
 
-	std::string localIp;
 
-	// Initialize Winsock
+	// initialize winsock and the server options
 	init();
 
 	initTypes();
-
-	if (argc > 2 && argv[2] != "/") {
-		localIp = argv[2];
-	} else {
-		localIp = "127.0.0.1";
-	}
-
-	if (argc > 1) {
-		baseDir = argv[1];
-	} else {
-		baseDir = "./";
-	}
-
 
 	ZeroMemory(&hints, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -105,8 +99,8 @@ int __cdecl main(int argc, char** argv) {
 	// Setup the TCP listening socket
 	setupListenSock();
 
-	std::cout << "Server now listenig on " << localIp << ":" << DEFAULT_PORT << std::endl;
-	std::cout << "On folder              " << baseDir << std::endl;
+	std::cout << "Server now listenig on " << localIp << ":" << PORT << std::endl;
+	std::cout << "On folder              " << baseDir << "/" << std::endl;
 
 	// Accept a client socket
 	acceptClientSock();
@@ -137,7 +131,7 @@ int __cdecl main(int argc, char** argv) {
 			std::cout << "\nREQUEST SATISFIED////////////////////////////////////////////////////////////////////" << std::endl;
 
 			// acknowledge the segment back to the sender
-			iSendResult = send(ClientSocket, message.c_str(), message.length(), 0);
+			iSendResult = send(ClientSocket, message.c_str(), (int) (message.length()), 0);
 
 			if (iSendResult == SOCKET_ERROR) {
 				std::cout << "send failed with error: " << WSAGetLastError() << std::endl;
@@ -352,10 +346,51 @@ void initTypes() {
 void init() {
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	checkError("WSAstartup");
+
+	// retrive initilization data from the .ini file
+
+	char buffer[MAX_PATH] = {0};
+
+	// this gives me the path to where the server was executed, for some reasons
+	_getcwd(buffer, MAX_PATH);
+
+	// compile the full path to the ini file
+	std::string ini_file = buffer;
+	ini_file += "\\";
+	ini_file += server_init_file;
+
+	std::string buf;
+	std::fstream Read;
+	std::vector<std::string> key_val;
+
+	Read.open(ini_file.c_str(), std::ios::in);
+	std::cout << server_init_file << std::endl;
+
+	// read props from the ini file and sets the important vars
+	if (Read.is_open()) {
+		while (std::getline(Read, buf)) {
+			key_val = split(buf, "=");
+
+			if (key_val.size() > 1) {
+				if (key_val[0] == "IP") {
+					localIp = key_val[1];
+				} else if (key_val[0] == "Port") {
+					PORT = key_val[1];
+				} else if (key_val[0] == "Base_Directory") {
+					baseDir = key_val[1];
+				} else if (key_val[0] == "Default_IP") {
+					default_IP = key_val[1];
+				}
+			}
+		}
+
+		Read.close();
+	}
+
 }
 
 void resolve(std::string ip) {
-	iResult = getaddrinfo(ip.c_str(), DEFAULT_PORT, &hints, &result);
+	iResult = getaddrinfo(ip.c_str(), PORT.c_str(), &hints, &result);
 	checkError("getaddrinfo");
 }
 
@@ -383,7 +418,7 @@ std::string compileHeader(std::vector<std::array<std::string, 2>> hOptions) {
 
 	std::string res;
 
-	for (int i = hOptions.size() - 1; i >= 0; i--) {
+	for (size_t i = 0; i < hOptions.size(); i++) {
 		res += hOptions[i][0] + ": " + hOptions[i][1] + "\n";
 	}
 	return res;
@@ -397,7 +432,7 @@ void compileMessage(const char* request, std::string& message) {
 	// GET ****** HTTP/ i need to get the (***) of unkown lenght, i skip GET and take a subtring from index 4 to index ?
 
 	// need the end index of the file requested
-	int endIndex = Srequest.find("HTTP/");
+	size_t endIndex = Srequest.find("HTTP/");
 
 	// actually get the filename with the heading slash (/), -5 cus std::string::find return the index of the last char of the string given
 
@@ -427,19 +462,19 @@ void compileMessage(const char* request, std::string& message) {
 						(std::istreambuf_iterator<char>()));
 
 	if (!content.empty()) {
-		hOptions.insert(hOptions.begin(), {"HTTP/1.1", "200 OK"});
-		std::string temp = filetype(file, ".");
+		hOptions.insert(hOptions.end(), {"HTTP/1.1", "200 OK"});
+		std::string temp = split(file, ".").back();
 
 		std::array<std::string, 2> content_type = {"Content-Type", Contents[temp]};
 		if (content_type[1] == "") {
 			content_type[1] = "text/plain";
 		}
 
-		hOptions.insert(hOptions.begin(), content_type);
+		hOptions.insert(hOptions.end(), content_type);
 
 	} else {
-		hOptions.insert(hOptions.begin(), {"HTTP/1.1", "404 Not Found"});
-		hOptions.insert(hOptions.begin(), {"Content-Type", "text/html; charset=UTF-8"});
+		hOptions.insert(hOptions.end(), {"HTTP/1.1", "404 Not Found"});
+		hOptions.insert(hOptions.end(), {"Content-Type", "text/html; charset=UTF-8"});
 		// get the missing page file
 		std::fstream ifs("source/404.html", std::ios::binary | std::ios::in);
 
@@ -447,9 +482,9 @@ void compileMessage(const char* request, std::string& message) {
 							  (std::istreambuf_iterator<char>()));
 	}
 
-	hOptions.insert(hOptions.begin(), {"Connection", "close"});
-	hOptions.insert(hOptions.begin(), {"Content-Lenght", std::to_string(content.length())});
-	hOptions.insert(hOptions.begin(), {"Server", "LeoCustom"});
+	hOptions.insert(hOptions.end(), {"Connection", "close"});
+	hOptions.insert(hOptions.end(), {"Content-Lenght", std::to_string(content.length())});
+	hOptions.insert(hOptions.end(), {"Server", "LeoCustom"});
 
 	std::string header = compileHeader(hOptions);
 

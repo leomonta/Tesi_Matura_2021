@@ -10,22 +10,22 @@
 #define DEFAULT_BUFLEN 10000
 #define DEFAULT_PORT "80"
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
 
 	WSADATA wsaData;
 	SOCKET ConnectSocket = INVALID_SOCKET;
-	struct addrinfo *result = NULL,
-					*ptr = NULL,
-					hints;
+	struct addrinfo* result = NULL,
+		* ptr = NULL,
+		hints;
 
 	std::string temp;
 
 	std::string file = argv[2];
 	std::string url = argv[1];
 
-	temp = "GET /" + file + " HTTP/1.1\r\nHost: " + url + "\r\nConnection: close\r\n\r\n";
+	temp = "GET /" + file + " HTTP/1.1";
 
-	const char *sendbuf = temp.c_str();
+	const char* sendbuf = temp.c_str();
 
 	printf(sendbuf);
 
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
 		}
 
 		// Connect to server.
-		iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
+		iResult = connect(ConnectSocket, ptr->ai_addr, (int) ptr->ai_addrlen);
 		if (iResult == SOCKET_ERROR) {
 			closesocket(ConnectSocket);
 			ConnectSocket = INVALID_SOCKET;
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 	}
 
 	// Send an initial buffer
-	iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0);
+	iResult = send(ConnectSocket, sendbuf, (int) strlen(sendbuf), 0);
 
 	printf("Bytes Sent: %d\n", iResult);
 
