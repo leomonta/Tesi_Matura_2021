@@ -15,15 +15,21 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\tcp_server.cpp">
+    <ClCompile Include="src\server.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\DBconn.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\HTTP_conn.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\DB_conn.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\HTTP_conn.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
