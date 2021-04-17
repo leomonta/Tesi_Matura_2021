@@ -1,21 +1,26 @@
 #undef UNICODE
 
+// system headers
 #define WIN32_LEAN_AND_MEAN
+#include <array>
+#include <direct.h> // needed to get the current directory 
 #include <fstream>
 #include <iostream>
 #include <map>
-#include <array>
 #include <string>
 #include <vector>
-#include <direct.h>
-#include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
+// my headers
+#include "DB_conn.hpp"
+
 #ifdef _DEBUG
-const char* server_init_file = "..\\server_options.ini";
+const char* server_init_file = "C:/Users/Leonardo/Desktop/workspace/vs-c++/TESI_MONTAGNER_MATURA/server_options.ini";
+#define DBG_FUNC //
 #else
-const char* server_init_file = ".\\server_options.ini";
+const char* server_init_file = "./server_options.ini";
+#define DBG_FUNC //
 #endif
 
 // Need to link with lws2_32 aka Ws2_32.lib
@@ -35,54 +40,36 @@ int iSendResult;
 char recvbuf[DEFAULT_BUFLEN];
 int recvbuflen = DEFAULT_BUFLEN;
 
-// variables for the logic
-std::string baseDir = "./";
-std::string localIp = "127.0.0.1";
-std::string default_IP = "0.0.0.0";
-std::string PORT = "80";
-std::map<std::string, std::string> Contents;
+// variables for initialization
+// http
+std::string HTTP_Basedir = ".";
+std::string HTTP_LocalIP = "127.0.0.1";
+std::string HTTP_Default_IP = "0.0.0.0";
+std::string HTTP_Port = "80";
+// Database
+std::string DB_Port = "3306";
+std::string DB_Host = "localhost";
+std::string DB_Username = "root";
+std::string DB_Password = "password";
+std::string DB_Name = "";
 
-void checkError(std::string type) {
 
-	if (iResult != 0) {
-		std::cout << type << " failed with error: " << iResult << " " << WSAGetLastError() << std::endl;
-		return;
-	}
-}
-
-std::vector<std::string> split(const std::string source, const std::string find) {
-	std::vector<std::string> res;
-	std::string haystack(source);
-
-	size_t pos = 0;
-	std::string token;
-	while ((pos = haystack.find(find)) != std::string::npos) {
-		token = haystack.substr(0, pos);
-		res.insert(res.end(), token);
-		haystack.erase(0, pos + find.length());
-	}
-	res.insert(res.end(), haystack);
-
-	return res;
-}
-
-void initTypes();
+void checkError(std::string type);
 void init();
 void resolve(std::string ip);
 void genListenSock();
 void setupListenSock();
 void acceptClientSock();
 std::string compileHeader(std::vector<std::array<std::string, 2>> hOptions);
-void compileMessage(const char* request, std::string& message);
-void urldecode2(char* dst, const char* src);
+void compileMessage(const char* request, std::string* message, std::string* header);
+void urlDecode(char* dst, const char* src);
+std::vector<std::string> split(const std::string source, const std::string find);
+std::string getContentType(std::string* filetype);
 
 int __cdecl main() {
 
-
 	// initialize winsock and the server options
 	init();
-
-	initTypes();
 
 	ZeroMemory(&hints, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -91,7 +78,7 @@ int __cdecl main() {
 	hints.ai_flags = AI_PASSIVE;
 
 	// Resolve the server address and port
-	resolve(localIp);
+	resolve(HTTP_LocalIP);
 
 	// Create a SOCKET for connecting to server
 	genListenSock();
@@ -99,8 +86,8 @@ int __cdecl main() {
 	// Setup the TCP listening socket
 	setupListenSock();
 
-	std::cout << "Server now listenig on " << localIp << ":" << PORT << std::endl;
-	std::cout << "On folder              " << baseDir << "/" << std::endl;
+	std::cout << "Server now listenig on " << HTTP_LocalIP << ":" << HTTP_Port << std::endl;
+	std::cout << "On folder              " << HTTP_Basedir << "/" << std::endl;
 
 	// Accept a client socket
 	acceptClientSock();
@@ -116,19 +103,23 @@ int __cdecl main() {
 
 		if (iResult > 0) {
 
-			std::cout << "\nREQUEST ARRIVED//////////////////////////////////////////////////////////////////////" << std::endl;
-			std::cout << "\nBytes received: " << iResult << std::endl;
+			HANDLE  hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
+			SetConsoleTextAttribute(hConsole, 10);
+			std::cout << "\nREQUEST ARRIVED---------------------------------------------------------------------------------------------------------------------" << std::endl;
+
+			SetConsoleTextAttribute(hConsole, 2);
+			std::cout << "\nHeader received, length in bytes: " << iResult << std::endl;
 			std::cout << recvbuf << std::endl;
 
+			SetConsoleTextAttribute(hConsole, 12);
 			std::cout << "\nHEADER SENT**************************************************************************" << std::endl;
 
 			std::string message;
+			std::string header;
 
-			compileMessage(recvbuf, message);
+			compileMessage(recvbuf, &message, &header);
 
-			// std::cout << message.c_str() << std::endl;
-
-			std::cout << "\nREQUEST SATISFIED////////////////////////////////////////////////////////////////////" << std::endl;
 
 			// acknowledge the segment back to the sender
 			iSendResult = send(ClientSocket, message.c_str(), (int) (message.length()), 0);
@@ -139,7 +130,14 @@ int __cdecl main() {
 				WSACleanup();
 				return 1;
 			}
+
+			SetConsoleTextAttribute(hConsole, 4);
 			std::cout << "Bytes sent: " << iSendResult << std::endl;
+
+			std::cout << header.c_str() << std::endl;
+
+			SetConsoleTextAttribute(hConsole, 6);
+			std::cout << "\nREQUEST SATISFIED////////////////////////////////////////////////////////////////////\n\n\n\n\n" << std::endl;
 			shutdown(ClientSocket, SD_SEND);
 
 			// std::cout << "Wait for further communications" << std::endl;
@@ -173,213 +171,55 @@ int __cdecl main() {
 	return 0;
 }
 
-// What a terrible idea, will make a data base
-void initTypes() {
-
-	// Text
-	Contents["1d-interleaved-parityfec"] = "text/1d-interleaved-parityfec";
-	Contents["cache-manifest"] = "text/cache-manifest";
-	Contents["calendar"] = "text/calendar";
-	Contents["cql"] = "text/cql";
-	Contents["cql-expression"] = "text/cql-expression";
-	Contents["cql-identifier"] = "text/cql-identifier";
-	Contents["css"] = "text/css";
-	Contents["csv"] = "text/csv";
-	Contents["csv-schema"] = "text/csv-schema";
-	Contents["directory"] = "text/directory";
-	Contents["dns"] = "text/dns";
-	Contents["ecmascript"] = "text/ecmascript";
-	Contents["encaprtp"] = "text/encaprtp";
-	Contents["enriched"] = "";
-	Contents["example"] = "text/example";
-	Contents["fhirpath"] = "text/fhirpath";
-	Contents["flexfec"] = "text/flexfec";
-	Contents["fwdred"] = "text/fwdred";
-	Contents["gff3"] = "text/gff3";
-	Contents["grammar-ref-list"] = "text/grammar-ref-list";
-	Contents["html"] = "text/html";
-	Contents["javascript"] = "text/javascript";
-	Contents["jcr-cnd"] = "text/jcr-cnd";
-	Contents["markdown"] = "text/markdown";
-	Contents["mizar"] = "text/mizar";
-	Contents["n3"] = "text/n3";
-	Contents["parameters"] = "text/parameters";
-	Contents["parityfec"] = "text/parityfec";
-	Contents["plain"] = "";
-	Contents["provenance-notation"] = "text/provenance-notation";
-	Contents["prs.fallenstein.rst"] = "text/prs.fallenstein.rst";
-	Contents["prs.lines.tag"] = "text/prs.lines.tag";
-	Contents["prs.prop.logic"] = "text/prs.prop.logic";
-	Contents["raptorfec"] = "text/raptorfec";
-	Contents["RED"] = "text/RED";
-	Contents["rfc822-headers"] = "text/rfc822-headers";
-	Contents["richtext"] = "";
-	Contents["rtf"] = "text/rtf";
-	Contents["rtp-enc-aescm128"] = "text/rtp-enc-aescm128";
-	Contents["rtploopback"] = "text/rtploopback";
-	Contents["rtx"] = "text/rtx";
-	Contents["SGML"] = "text/SGML";
-	Contents["shaclc"] = "text/shaclc";
-	Contents["spdx"] = "text/spdx";
-	Contents["strings"] = "text/strings";
-	Contents["t140"] = "text/t140";
-	Contents["tab-separated-values"] = "text/tab-separated-values";
-	Contents["troff"] = "text/troff";
-	Contents["turtle"] = "text/turtle";
-	Contents["ulpfec"] = "text/ulpfec";
-	Contents["uri-list"] = "text/uri-list";
-	Contents["vcard"] = "text/vcard";
-	Contents["vnd.a"] = "text/vnd.a";
-	Contents["vnd.abc"] = "text/vnd.abc";
-	Contents["vnd.ascii-art"] = "text/vnd.ascii-art";
-	Contents["vnd.curl"] = "text/vnd.curl";
-	Contents["vnd.debian.copyright"] = "text/vnd.debian.copyright";
-	Contents["vnd.DMClientScript"] = "text/vnd.DMClientScript";
-	Contents["vnd.dvb.subtitle"] = "text/vnd.dvb.subtitle";
-	Contents["vnd.esmertec.theme-descriptor"] = "text/vnd.esmertec.theme-descriptor";
-	Contents["vnd.ficlab.flt"] = "text/vnd.ficlab.flt";
-	Contents["vnd.fly"] = "text/vnd.fly";
-	Contents["vnd.fmi.flexstor"] = "text/vnd.fmi.flexstor";
-	Contents["vnd.gml"] = "text/vnd.gml";
-	Contents["vnd.graphviz"] = "text/vnd.graphviz";
-	Contents["vnd.hans"] = "text/vnd.hans";
-	Contents["vnd.hgl"] = "text/vnd.hgl";
-	Contents["vnd.in3d.3dml"] = "text/vnd.in3d.3dml";
-	Contents["vnd.in3d.spot"] = "text/vnd.in3d.spot";
-	Contents["vnd.IPTC.NewsML"] = "text/vnd.IPTC.NewsML";
-	Contents["vnd.IPTC.NITF"] = "text/vnd.IPTC.NITF";
-	Contents["vnd.latex-z"] = "text/vnd.latex-z";
-	Contents["vnd.motorola.reflex"] = "text/vnd.motorola.reflex";
-	Contents["vnd.ms-mediapackage"] = "text/vnd.ms-mediapackage";
-	Contents["vnd.net2phone.commcenter.command"] = "text/vnd.net2phone.commcenter.command";
-	Contents["vnd.radisys.msml-basic-layout"] = "text/vnd.radisys.msml-basic-layout";
-	Contents["vnd.senx.warpscript"] = "text/vnd.senx.warpscript";
-	Contents["vnd.si.uricatalogue - OBSOLETED by request"] = "text/vnd.si.uricatalogue";
-	Contents["vnd.sun.j2me.app-descriptor"] = "text/vnd.sun.j2me.app-descriptor";
-	Contents["vnd.sosi"] = "text/vnd.sosi";
-	Contents["vnd.trolltech.linguist"] = "text/vnd.trolltech.linguist";
-	Contents["vnd.wap.si"] = "text/vnd.wap.si";
-	Contents["vnd.wap.sl"] = "text/vnd.wap.sl";
-	Contents["vnd.wap.wml"] = "text/vnd.wap.wml";
-	Contents["vnd.wap.wmlscript"] = "text/vnd.wap.wmlscript";
-	Contents["vtt"] = "text/vtt";
-	Contents["xml"] = "text/xml";
-	Contents["xml-external-parsed-entity"] = "text/xml-external-parsed-entity";
-	// images
-	Contents["aces"] = "image/aces";
-	Contents["avci"] = "image/avci";
-	Contents["avcs"] = "image/avcs";
-	Contents["avif"] = "image/avif";
-	Contents["bmp"] = "image/bmp";
-	Contents["cgm"] = "image/cgm";
-	Contents["dicom-rle"] = "image/dicom-rle";
-	Contents["emf"] = "image/emf";
-	Contents["example"] = "image/example";
-	Contents["fits"] = "image/fits";
-	Contents["g3fax"] = "image/g3fax";
-	Contents["gif"] = "image/gif";
-	Contents["heic"] = "image/heic";
-	Contents["heic-sequence"] = "image/heic-sequence";
-	Contents["heif"] = "image/heif";
-	Contents["heif-sequence"] = "image/heif-sequence";
-	Contents["hej2k"] = "image/hej2k";
-	Contents["hsj2"] = "image/hsj2";
-	Contents["jls"] = "image/jls";
-	Contents["jp2"] = "image/jp2";
-	Contents["jpeg"] = "image/jpeg";
-	Contents["jpg"] = "image/jpg";
-	Contents["jph"] = "image/jph";
-	Contents["jphc"] = "image/jphc";
-	Contents["jpm"] = "image/jpm";
-	Contents["jpx"] = "image/jpx";
-	Contents["jxr"] = "image/jxr";
-	Contents["jxrA"] = "image/jxrA";
-	Contents["jxrS"] = "image/jxrS";
-	Contents["jxs"] = "image/jxs";
-	Contents["jxsc"] = "image/jxsc";
-	Contents["jxsi"] = "image/jxsi";
-	Contents["jxss"] = "image/jxss";
-	Contents["ktx"] = "image/ktx";
-	Contents["ktx2"] = "image/ktx2";
-	Contents["naplps"] = "image/naplps";
-	Contents["png"] = "image/png";
-	Contents["prs.btif"] = "image/prs.btif";
-	Contents["prs.pti"] = "image/prs.pti";
-	Contents["pwg-raster"] = "image/pwg-raster";
-	Contents["svg+xml"] = "image/svg+xml";
-	Contents["t38"] = "image/t38";
-	Contents["tiff"] = "image/tiff";
-	Contents["tiff-fx"] = "image/tiff-fx";
-	Contents["vnd.adobe.photoshop"] = "image/vnd.adobe.photoshop";
-	Contents["vnd.airzip.accelerator.azv"] = "image/vnd.airzip.accelerator.azv";
-	Contents["vnd.cns.inf2"] = "image/vnd.cns.inf2";
-	Contents["vnd.dece.graphic"] = "image/vnd.dece.graphic";
-	Contents["vnd.djvu"] = "image/vnd.djvu";
-	Contents["vnd.dwg"] = "image/vnd.dwg";
-	Contents["vnd.dxf"] = "image/vnd.dxf";
-	Contents["vnd.dvb.subtitle"] = "image/vnd.dvb.subtitle";
-	Contents["vnd.fastbidsheet"] = "image/vnd.fastbidsheet";
-	Contents["vnd.fpx"] = "image/vnd.fpx";
-	Contents["vnd.fst"] = "image/vnd.fst";
-	Contents["vnd.fujixerox.edmics-mmr"] = "image/vnd.fujixerox.edmics-mmr";
-	Contents["vnd.fujixerox.edmics-rlc"] = "image/vnd.fujixerox.edmics-rlc";
-	Contents["vnd.globalgraphics.pgb"] = "image/vnd.globalgraphics.pgb";
-	Contents["vnd.microsoft.icon"] = "image/vnd.microsoft.icon";
-	Contents["vnd.mix"] = "image/vnd.mix";
-	Contents["vnd.ms-modi"] = "image/vnd.ms-modi";
-	Contents["vnd.mozilla.apng"] = "image/vnd.mozilla.apng";
-	Contents["vnd.net-fpx"] = "image/vnd.net-fpx";
-	Contents["vnd.pco.b16"] = "image/vnd.pco.b16";
-	Contents["vnd.radiance"] = "image/vnd.radiance";
-	Contents["vnd.sealed.png"] = "image/vnd.sealed.png";
-	Contents["vnd.sealedmedia.softseal.gif"] = "image/vnd.sealedmedia.softseal.gif";
-	Contents["vnd.sealedmedia.softseal.jpg"] = "image/vnd.sealedmedia.softseal.jpg";
-	Contents["vnd.svf"] = "image/vnd.svf";
-	Contents["vnd.tencent.tap"] = "image/vnd.tencent.tap";
-	Contents["vnd.valve.source.texture"] = "image/vnd.valve.source.texture";
-	Contents["vnd.wap.wbmp"] = "image/vnd.wap.wbmp";
-	Contents["vnd.xiff"] = "image/vnd.xiff";
-	Contents["vnd.zbrush.pcx"] = "image/vnd.zbrush.pcx";
-	Contents["wmf"] = "image/wmf";
-}
-
 void init() {
+	// init WSA for networking
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	checkError("WSAstartup");
 
 	// retrive initilization data from the .ini file
 
-	char buffer[MAX_PATH] = {0};
+	//char buffer[MAX_PATH] = {0};
 
-	// this gives me the path to where the server was executed, for some reasons
-	_getcwd(buffer, MAX_PATH);
+	// this gives me the path to where the server was executed, for some reasons it also returns the pointer i gave it
+	//_getcwd(buffer, MAX_PATH);
+	//std::cout << buffer << std::endl;
 
 	// compile the full path to the ini file
-	std::string ini_file = buffer;
-	ini_file += "\\";
-	ini_file += server_init_file;
+	//std::string ini_file = buffer;
+	//ini_file += "\\";
+	//ini_file += server_init_file;
 
 	std::string buf;
-	std::fstream Read;
+	std::fstream Read(server_init_file, std::ios::in);;
 	std::vector<std::string> key_val;
 
-	Read.open(ini_file.c_str(), std::ios::in);
-	std::cout << server_init_file << std::endl;
-
-	// read props from the ini file and sets the important vars
+	// read props from the ini file and sets the important variables
 	if (Read.is_open()) {
 		while (std::getline(Read, buf)) {
 			key_val = split(buf, "=");
 
 			if (key_val.size() > 1) {
+				// sectioon [HTTP]
 				if (key_val[0] == "IP") {
-					localIp = key_val[1];
-				} else if (key_val[0] == "Port") {
-					PORT = key_val[1];
+					HTTP_LocalIP = key_val[1];
+				} else if (key_val[0] == "HTTP_Port") {
+					HTTP_Port = key_val[1];
 				} else if (key_val[0] == "Base_Directory") {
-					baseDir = key_val[1];
+					HTTP_Basedir = key_val[1];
 				} else if (key_val[0] == "Default_IP") {
-					default_IP = key_val[1];
+					HTTP_Default_IP = key_val[1];
+				}
+				// section [Database]
+				else if (key_val[0] == "DB_Port") {
+					DB_Port = key_val[1];
+				} else if (key_val[0] == "host") {
+					DB_Host = key_val[1];
+				} else if (key_val[0] == "password") {
+					DB_Password = key_val[1];
+				} else if (key_val[0] == "username") {
+					DB_Username = key_val[1];
+				} else if (key_val[0] == "Database_Name") {
+					DB_Name = key_val[1];
 				}
 			}
 		}
@@ -390,7 +230,7 @@ void init() {
 }
 
 void resolve(std::string ip) {
-	iResult = getaddrinfo(ip.c_str(), PORT.c_str(), &hints, &result);
+	iResult = getaddrinfo(ip.c_str(), HTTP_Port.c_str(), &hints, &result);
 	checkError("getaddrinfo");
 }
 
@@ -424,7 +264,10 @@ std::string compileHeader(std::vector<std::array<std::string, 2>> hOptions) {
 	return res;
 }
 
-void compileMessage(const char* request, std::string& message) {
+/**
+* Compose Header, read the requested file, compile the final message and set the given message as it
+*/
+void compileMessage(const char* request, std::string* message, std::string* header = nullptr) {
 
 	std::string Srequest = request;
 
@@ -440,11 +283,11 @@ void compileMessage(const char* request, std::string& message) {
 
 	char* dst = (char*) (file.c_str());
 
-	urldecode2(dst, file.c_str());
+	urlDecode(dst, file.c_str());
 
 	file = dst;
 
-	file = baseDir + file;
+	file = HTTP_Basedir + file;
 	if (file.back() == '/') {
 		file += "index.html";
 	}
@@ -465,7 +308,7 @@ void compileMessage(const char* request, std::string& message) {
 		hOptions.insert(hOptions.end(), {"HTTP/1.1", "200 OK"});
 		std::string temp = split(file, ".").back();
 
-		std::array<std::string, 2> content_type = {"Content-Type", Contents[temp]};
+		std::array<std::string, 2> content_type = {"Content-Type", getContentType(&temp)};
 		if (content_type[1] == "") {
 			content_type[1] = "text/plain";
 		}
@@ -486,17 +329,20 @@ void compileMessage(const char* request, std::string& message) {
 	hOptions.insert(hOptions.end(), {"Content-Lenght", std::to_string(content.length())});
 	hOptions.insert(hOptions.end(), {"Server", "LeoCustom"});
 
-	std::string header = compileHeader(hOptions);
+	std::string Head = compileHeader(hOptions);
 
-	std::cout << header << std::endl;
+	std::cout << Head << std::endl;
 
-	std::string SendString = header + "\n" + content;
+	std::string SendString = Head + "\n" + content;
 
-	message = SendString;
+	if (header != nullptr) {
+		*header = Head;
+	}
+	*message = SendString;
 }
 
 // Thank you ThomasH, https://stackoverflow.com/users/2012498/thomash at https://stackoverflow.com/questions/2673207/c-c-url-decode-library/2766963,
-void urldecode2(char* dst, const char* src) {
+void urlDecode(char* dst, const char* src) {
 	char a, b;
 	while (*src) {
 		if ((*src == '%') &&
@@ -524,4 +370,68 @@ void urldecode2(char* dst, const char* src) {
 		}
 	}
 	*dst++ = '\0';
+}
+
+/**
+* Split the given string with a single token, and return the vector of the splitted strings
+*/
+std::vector<std::string> split(const std::string source, const std::string find) {
+	std::vector<std::string> res;
+	std::string haystack(source);
+
+	size_t pos = 0;
+	std::string token;
+	while ((pos = haystack.find(find)) != std::string::npos) {
+		token = haystack.substr(0, pos);
+		res.insert(res.end(), token);
+		haystack.erase(0, pos + find.length());
+	}
+	res.insert(res.end(), haystack);
+
+	return res;
+}
+
+/**
+* just print the error with a little formatting
+*/
+void checkError(std::string type) {
+
+	if (iResult != 0) {
+		std::cout << type << " failed with error: " << iResult << " " << WSAGetLastError() << std::endl;
+		return;
+	}
+}
+
+/**
+* Query the database for the correct file type
+*/
+std::string getContentType(std::string* filetype) {
+
+	// create connection
+	std::string host("tcp://" + DB_Host + ":" + DB_Port);
+	sql::SQLString l_host(host.c_str());
+	sql::SQLString l_uname(DB_Username.c_str());
+	sql::SQLString l_pwd(DB_Password.c_str());
+	sql::SQLString l_name(DB_Name.c_str());
+
+	Database_connection conn(&l_host, &l_uname, &l_pwd, &l_name);
+
+	// build query
+	std::string query = "SELECT * FROM types WHERE type LIKE '";
+	query += (*filetype).c_str();
+	query += "'";
+
+	// execute query
+	sql::ResultSet* res;
+	sql::SQLString t = query.c_str();
+	res = conn.Query(&t);
+
+
+	// i only get the first result
+	std::string result;
+	if (res->next()) {
+		result = res->getString("content");
+	}
+	return result;
+
 }
