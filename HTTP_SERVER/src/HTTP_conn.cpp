@@ -3,10 +3,8 @@
 
 #ifdef _DEBUG
 const char* server_init_file = "C:/Users/Leonardo/Desktop/workspace/vs-c++/TESI_MONTAGNER_MATURA/server_options.ini";
-#define DEBUG_FUNC
 #else
 const char* server_init_file = "./server_options.ini";
-#define DEBUG_FUNC //
 #endif
 
 /**
@@ -164,7 +162,7 @@ SOCKET HTTP_conn::acceptClientSock() {
 
 		if (s != nullptr) {
 			inet_ntop(AF_INET, &(temp->sin_addr), s, INET_ADDRSTRLEN);
-			std::cout << "accepted client : " << s << std::endl;
+			std::cout << "\naccepted client : " << s << std::endl;
 		}
 	}
 	return result;
@@ -173,8 +171,22 @@ SOCKET HTTP_conn::acceptClientSock() {
 /**
 * Shortcup to close the current client socket
 */
-void HTTP_conn::closeClientSock(SOCKET clientSock) {
-	closesocket(clientSock);
+void HTTP_conn::closeClientSock(SOCKET* clientSock) {
+
+	std::string temp;
+	int size;
+	while (true) {
+		size = receiveRequest(clientSock, &temp);
+		if (size <= 0) {
+			break;
+		}
+	}
+
+	closesocket(*clientSock);
+}
+
+void HTTP_conn::shutDown(SOCKET* clientSock) {
+	shutdown(*clientSock, SD_SEND);
 }
 
 HTTP_conn::HTTP_conn() {
@@ -233,7 +245,7 @@ void HTTP_conn::compileMessage(const char* request, std::string* message, std::s
 		file += "index.html";
 	}
 
-	DEBUG_FUNC std::cout << "File requested: " << file << std::endl;
+	std::cout << "File requested: " << file << std::endl;
 
 	// ------------------------------------------------------------------------------------------------ Start Compiling Header
 
@@ -284,7 +296,9 @@ void HTTP_conn::compileMessage(const char* request, std::string* message, std::s
 	std::string Head;
 	compileHeader(&hOptions, &Head);
 
-	DEBUG_FUNC std::cout << Head << std::endl;
+	#ifdef _DEBUG
+	std::cout << Head << std::endl;
+	#endif
 
 	std::string SendString = Head + "\n" + content;
 
@@ -339,7 +353,11 @@ int HTTP_conn::receiveRequest(SOCKET* clientSock, std::string* buff) {
 	char recvbuf[DEFAULT_BUFLEN];
 	// result is the amount of bytes received
 	int result = recv(*clientSock, recvbuf, DEFAULT_BUFLEN, 0);
-	*buff = std::string(recvbuf, result);
+	if (result > 0) {
+		*buff = std::string(recvbuf, result);
+	} else {
+		*buff = "";
+	}
 	return result;
 }
 

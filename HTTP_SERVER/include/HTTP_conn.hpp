@@ -27,7 +27,7 @@ private:
 
 	// variables for initialization
 	// http
-	std::string HTTP_Basedir = ".";
+	std::string HTTP_Basedir = "/";
 	std::string HTTP_IP = "127.0.0.1";
 	std::string HTTP_Default_IP = "0.0.0.0";
 	std::string HTTP_Port = "80";
@@ -64,6 +64,7 @@ public:
 	int receiveRequest(SOCKET* clientSock, std::string* buff);
 	int sendResponse(SOCKET* clientSock, std::string* buff);
 	SOCKET acceptClientSock();
-	void closeClientSock(SOCKET clientSock);
+	void closeClientSock(SOCKET* clientSock);
+	void shutDown(SOCKET* clientSock);
 
 };
