@@ -3,6 +3,7 @@
 // system headers
 #define WIN32_LEAN_AND_MEAN
 #include <array>
+#include "zlib.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -54,6 +55,7 @@ private:
 	void urlDecode(char* dst, const char* src);
 	std::string getContentType(std::string* filetype);
 	std::vector<std::string> split(const std::string source, const std::string find);
+	void compressGz(std::string& output, const char* data, std::size_t size);
 
 public:
 

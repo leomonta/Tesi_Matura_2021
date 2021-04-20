@@ -298,8 +298,10 @@ void HTTP_conn::compileMessage(const char* request, std::string* message, std::s
 	std::string Head;
 	compileHeader(&hOptions, &Head);
 
+	std::string gz_content;
+	compressGz(gz_content, content.c_str(), content.size());
 
-	std::string SendString = Head + "\n" + content;
+	std::string SendString = Head + "\n" + gz_content;
 
 	if (header != nullptr) {
 		*header = Head;
@@ -367,4 +369,46 @@ int HTTP_conn::sendResponse(SOCKET* clientSock, std::string* buff) {
 
 	int result = send(*clientSock, buff->c_str(), buff->size(), 0);
 	return result;
+}
+
+/**
+* compress data to gzip
+* used this (https://github.com/mapbox/gzip-hpp/blob/master/include/gzip/compress.hpp) as a reference
+*/
+void HTTP_conn::compressGz(std::string& output, const char* data, std::size_t size) {
+
+	z_stream deflate_s;
+	deflate_s.zalloc = Z_NULL;
+	deflate_s.zfree = Z_NULL;
+	deflate_s.opaque = Z_NULL;
+	deflate_s.avail_in = 0;
+	deflate_s.next_in = Z_NULL;
+
+	constexpr int window_bits = 15 + 16; // gzip with windowbits of 15
+
+	constexpr int mem_level = 8;
+
+	if (deflateInit2(&deflate_s, Z_BEST_COMPRESSION, Z_DEFLATED, window_bits, mem_level, Z_DEFAULT_STRATEGY) != Z_OK) {
+		throw std::runtime_error("deflate init failed");
+	}
+
+	deflate_s.next_in = (Bytef*) data;
+	deflate_s.avail_in = (uInt) size;
+
+	std::size_t size_compressed = 0;
+	do {
+		size_t increase = size / 2 + 1024;
+		if (output.size() < (size_compressed + increase)) {
+			output.resize(size_compressed + increase);
+		}
+
+		deflate_s.avail_out = static_cast<unsigned int>(increase);
+		deflate_s.next_out = reinterpret_cast<Bytef*>((&output[0] + size_compressed));
+
+		deflate(&deflate_s, Z_FINISH);
+		size_compressed += (increase - deflate_s.avail_out);
+	} while (deflate_s.avail_out == 0);
+
+	deflateEnd(&deflate_s);
+	output.resize(size_compressed);
 }
