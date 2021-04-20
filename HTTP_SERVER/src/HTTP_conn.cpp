@@ -289,16 +289,15 @@ void HTTP_conn::compileMessage(const char* request, std::string* message, std::s
 							  (std::istreambuf_iterator<char>()));
 	}
 
-	hOptions.insert(hOptions.end(), {"Connection", "close"});
+	hOptions.insert(hOptions.end(), {"Content-Encoding", "gzip"});
+	hOptions.insert(hOptions.end(), {"Vary", "Accept-Encoding"});
 	hOptions.insert(hOptions.end(), {"Content-Lenght", std::to_string(content.length())});
+	hOptions.insert(hOptions.end(), {"Connection", "close"});
 	hOptions.insert(hOptions.end(), {"Server", "LeoCustom"});
 
 	std::string Head;
 	compileHeader(&hOptions, &Head);
 
-	#ifdef _DEBUG
-	std::cout << Head << std::endl;
-	#endif
 
 	std::string SendString = Head + "\n" + content;
 
@@ -342,7 +341,6 @@ std::string HTTP_conn::getContentType(std::string* filetype) {
 	}
 
 	return result;
-
 }
 
 /**
@@ -352,6 +350,7 @@ int HTTP_conn::receiveRequest(SOCKET* clientSock, std::string* buff) {
 
 	char recvbuf[DEFAULT_BUFLEN];
 	// result is the amount of bytes received
+
 	int result = recv(*clientSock, recvbuf, DEFAULT_BUFLEN, 0);
 	if (result > 0) {
 		*buff = std::string(recvbuf, result);
@@ -366,8 +365,6 @@ int HTTP_conn::receiveRequest(SOCKET* clientSock, std::string* buff) {
 */
 int HTTP_conn::sendResponse(SOCKET* clientSock, std::string* buff) {
 
-	int size = (int) (*buff).length();
-	int result = send(*clientSock, (*buff).c_str(), size, 0);
-
+	int result = send(*clientSock, buff->c_str(), buff->size(), 0);
 	return result;
 }

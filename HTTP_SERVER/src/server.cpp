@@ -1,3 +1,5 @@
+#include <thread>
+#include <mutex>
 // my headers
 #include "DB_conn.hpp"
 #include "HTTP_conn.hpp"
@@ -8,8 +10,12 @@
 * Todos: caching, keep in memory files
 */
 
+// active threads
+// std::vector<std::thread> threads;
+// for controlling debug prints
+std::mutex mtx;
 
-void resolveRequest(SOCKET* clientSocket, HTTP_conn* http_);
+void resolveRequest(SOCKET clientSocket, HTTP_conn* http_);
 
 int __cdecl main() {
 
@@ -18,7 +24,6 @@ int __cdecl main() {
 
 	// used for controlling 
 	int iResult;
-	int iSendResult;
 	SOCKET client;
 	std::string request;
 
@@ -28,9 +33,9 @@ int __cdecl main() {
 		client = http.acceptClientSock();
 		if (client == INVALID_SOCKET) {
 			continue;
+		} else {
+			std::thread(resolveRequest, client, &http).detach();
 		}
-
-		resolveRequest(&client, &http);
 
 	}
 
@@ -48,15 +53,21 @@ int __cdecl main() {
 	return 0;
 }
 
-void resolveRequest(SOCKET* clientSocket, HTTP_conn* http_) {
+void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
+
+	mtx.lock();
+	std::cout << "thread for socket: " << clientSocket << " started" << std::endl;
+	mtx.unlock();
 
 	int iResult;
 	int iSendResult;
 	std::string request;
+	std::string message;
+	std::string header;
 
 	while (true) {
 
-		iResult = http_->receiveRequest(clientSocket, &request);
+		iResult = http_->receiveRequest(&clientSocket, &request);
 
 		// received some bytes
 		if (iResult > 0) {
@@ -77,21 +88,22 @@ void resolveRequest(SOCKET* clientSocket, HTTP_conn* http_) {
 			#endif // _DEBUG
 
 			// message body and header
-			std::string message;
-			std::string header;
 
+			#ifdef _DEBUG
 			// message compprehend both header and body
+			std::cout << "thread: " << clientSocket << std::endl;
+			#endif // _DEBUG
 			http_->compileMessage(request.c_str(), &message, &header);
 
 			// acknowledge the segment back to the sender
-			iSendResult = http_->sendResponse(clientSocket, &message);
+			iSendResult = http_->sendResponse(&clientSocket, &message);
 
 			// send failed, close socket and close program
 			if (iSendResult == SOCKET_ERROR) {
 				std::cout << "send failed with error: " << WSAGetLastError() << std::endl;
-				http_->closeClientSock(clientSocket);
+				http_->closeClientSock(&clientSocket);
 				WSACleanup();
-				return;
+				break;
 			}
 
 			#ifdef _DEBUG
@@ -106,8 +118,8 @@ void resolveRequest(SOCKET* clientSocket, HTTP_conn* http_) {
 			std::cout << "\nREQUEST SATISFIED////////////////////////////////////////////////////////////////////\n\n\n\n\n" << std::endl;
 			#endif // _DEBUG
 
-			http_->shutDown(clientSocket);
-			return;
+			http_->shutDown(&clientSocket);
+			break;
 		}
 
 		// received an error
@@ -115,14 +127,18 @@ void resolveRequest(SOCKET* clientSocket, HTTP_conn* http_) {
 			iResult = 0;
 			std::cout << "Error! Cannot keep on listening" << WSAGetLastError();
 
-			http_->shutDown(clientSocket);
-			return;
+			http_->shutDown(&clientSocket);
+			break;
 		}
 
 		// nothing received, depend on the request
-		//if (iResult == 0) {
-		//	http.closeClientSock(client);
-		// receiveRequest return number of bytes received, if 0 it received nothing
-		//}
+		if (iResult == 0) {
+			break;
+		}
 	}
+
+	mtx.lock();
+	std::cout << "thread for socket: " << clientSocket << " finished" << std::endl;
+	mtx.unlock();
 }
+
