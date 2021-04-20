@@ -2,14 +2,15 @@
 
 // system headers
 #define WIN32_LEAN_AND_MEAN
-#include <array>
-#include "zlib.h"
+#include <fstream>
 #include <iostream>
+#include <map>
 #include <string>
 #include <vector>
 #include <WinSock2.h>
 #include <WS2tcpip.h>
-#include <fstream>
+
+#include "zlib.h"
 
 #define DEFAULT_BUFLEN 8000
 
@@ -61,7 +62,7 @@ public:
 
 	HTTP_conn();
 	void create();
-	void compileHeader(std::vector<std::array<std::string, 2>>* headerOptions, std::string* result);
+	void compileHeader(std::map<std::string, std::string>* headerOptions, std::string* result);
 	void compileMessage(const char* request, std::string* message, std::string* header);
 	int receiveRequest(SOCKET* clientSock, std::string* buff);
 	int sendResponse(SOCKET* clientSock, std::string* buff);

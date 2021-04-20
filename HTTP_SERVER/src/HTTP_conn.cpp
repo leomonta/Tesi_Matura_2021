@@ -4,7 +4,7 @@
 #ifdef _DEBUG
 const char* server_init_file = "C:/Users/Leonardo/Desktop/workspace/vs-c++/TESI_MONTAGNER_MATURA/server_options.ini";
 #else
-const char* server_init_file = "./server_options.ini";
+const char* server_init_file = "../server_options.ini";
 #endif
 
 /**
@@ -202,12 +202,18 @@ void HTTP_conn::create() {
 /**
 * format the header from the array to a string
 */
-void HTTP_conn::compileHeader(std::vector<std::array<std::string, 2>>* headerOptions, std::string* result) {
+void HTTP_conn::compileHeader(std::map<std::string, std::string>* headerOptions, std::string* result) {
 	std::string temp_result;
 
-	for (size_t i = 0; i < (*headerOptions).size(); i++) {
-		//				header option name		 :		 header option value
-		temp_result += (*headerOptions)[i][0] + ": " + (*headerOptions)[i][1] + "\n";
+	// Always the response code fisrt
+	temp_result += "HTTP/1.1: " + (*headerOptions)["HTTP/1.1"] + "\n";
+
+	for (auto const& [key, val] : *headerOptions) {
+		// already wrote response code
+		if (key != "HTTP/1.1") {
+			// header option name :	header option value
+			temp_result += key + ": " + val + "\n";
+		}
 	}
 
 	// write the result on the given string
@@ -249,9 +255,8 @@ void HTTP_conn::compileMessage(const char* request, std::string* message, std::s
 
 	// ------------------------------------------------------------------------------------------------ Start Compiling Header
 
-	// i use an array instead if a map cus a map(even if unordered) has its own internal order and i need the 
-	// response code to ALWAYS be fisrt obviously, and i can achieve this by using hOptions.begin()
-	std::vector<std::array<std::string, 2>> hOptions;
+	// I use map to easily manage key : value, the only problem is when i compile the header, the response must be at the top
+	std::map<std::string, std::string> headerOptions;
 
 	// get the required file
 	std::fstream ifs(file.c_str(), std::ios::binary | std::ios::in);
@@ -263,40 +268,43 @@ void HTTP_conn::compileMessage(const char* request, std::string* message, std::s
 	// if the file does not exist i get an empty string
 	if (!content.empty()) {
 
-		// reqeusted file exist
+		// requsted file exist
 
 		// status code OK
-		hOptions.insert(hOptions.begin(), {"HTTP/1.1", "200 OK"});
+		headerOptions["HTTP/1.1"] = "200 OK";
 
 		// get the file extension, i'll use it to get the content type
 		std::string temp = split(file, ".").back();
 
 		// get the content type
-		std::array<std::string, 2> content_type = {"Content-Type", getContentType(&temp)};
-		if (content_type[1] == "") {
-			content_type[1] = "text/plain";
+		std::string content_type = getContentType(&temp);
+		// fallback if finds nothing
+		if (content_type == "") {
+			content_type = "text/plain";
 		}
 
-		hOptions.insert(hOptions.end(), content_type);
+		headerOptions["Content-Type"] = content_type;
 
 	} else {
-		hOptions.insert(hOptions.begin(), {"HTTP/1.1", "404 Not Found"});
-		hOptions.insert(hOptions.end(), {"Content-Type", "text/html; charset=UTF-8"});
-		// get the missing page file
+		// status code Not Found
+		headerOptions["HTTP/1.1"] = "404 Not Found";
+		headerOptions["Content-Type"] = "text/html; charset=UTF-8";
+		// get the missing page file, if there's no such file just send the header
 		std::fstream ifs("source/404.html", std::ios::binary | std::ios::in);
 
 		content = std::string((std::istreambuf_iterator<char>(ifs)),
 							  (std::istreambuf_iterator<char>()));
 	}
 
-	hOptions.insert(hOptions.end(), {"Content-Encoding", "gzip"});
-	hOptions.insert(hOptions.end(), {"Vary", "Accept-Encoding"});
-	hOptions.insert(hOptions.end(), {"Content-Lenght", std::to_string(content.length())});
-	hOptions.insert(hOptions.end(), {"Connection", "close"});
-	hOptions.insert(hOptions.end(), {"Server", "LeoCustom"});
+	// various header options
+	headerOptions["Content-Lenght"] = std::to_string(content.length());
+	headerOptions["Content-Encoding"] = "gzip";
+	headerOptions["Connection"] = "close";
+	headerOptions["Vary"] = "Accept-Encoding";
+	headerOptions["Server"] = "LeoCustom";
 
 	std::string Head;
-	compileHeader(&hOptions, &Head);
+	compileHeader(&headerOptions, &Head);
 
 	std::string gz_content;
 	compressGz(gz_content, content.c_str(), content.size());
