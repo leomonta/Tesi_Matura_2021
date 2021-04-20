@@ -57,6 +57,7 @@ private:
 	std::string getContentType(std::string* filetype);
 	std::vector<std::string> split(const std::string source, const std::string find);
 	void compressGz(std::string& output, const char* data, std::size_t size);
+	std::string getUTC();
 
 public:
 
@@ -64,6 +65,7 @@ public:
 	void create();
 	void compileHeader(std::map<std::string, std::string>* headerOptions, std::string* result);
 	void compileMessage(const char* request, std::string* message, std::string* header);
+	std::map<std::string, std::string> decompileHeader(const char* rawHeader, size_t size);
 	int receiveRequest(SOCKET* clientSock, std::string* buff);
 	int sendResponse(SOCKET* clientSock, std::string* buff);
 	SOCKET acceptClientSock();

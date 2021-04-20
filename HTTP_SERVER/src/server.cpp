@@ -68,6 +68,7 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 	while (true) {
 
 		iResult = http_->receiveRequest(&clientSocket, &request);
+		http_->decompileHeader(request.c_str(), request.size());
 
 		// received some bytes
 		if (iResult > 0) {
@@ -80,7 +81,7 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 			std::cout << "\nREQUEST ARRIVED---------------------------------------------------------------------------------------------------------------------" << std::endl;
 
 			SetConsoleTextAttribute(hConsole, 2);
-			std::cout << "\nHeader received" << iResult << " bytes" << std::endl;
+			std::cout << "\nByes received: " << iResult << std::endl;
 			std::cout << request.c_str() << std::endl;
 
 			SetConsoleTextAttribute(hConsole, 12);

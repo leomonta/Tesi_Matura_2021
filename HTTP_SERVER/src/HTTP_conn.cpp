@@ -206,7 +206,7 @@ void HTTP_conn::compileHeader(std::map<std::string, std::string>* headerOptions,
 	std::string temp_result;
 
 	// Always the response code fisrt
-	temp_result += "HTTP/1.1: " + (*headerOptions)["HTTP/1.1"] + "\n";
+	temp_result += "HTTP/1.1 " + (*headerOptions)["HTTP/1.1"] + "\n";
 
 	for (auto const& [key, val] : *headerOptions) {
 		// already wrote response code
@@ -297,11 +297,13 @@ void HTTP_conn::compileMessage(const char* request, std::string* message, std::s
 	}
 
 	// various header options
+
+	headerOptions["Date"] = getUTC();
 	headerOptions["Content-Lenght"] = std::to_string(content.length());
 	headerOptions["Content-Encoding"] = "gzip";
 	headerOptions["Connection"] = "close";
 	headerOptions["Vary"] = "Accept-Encoding";
-	headerOptions["Server"] = "LeoCustom";
+	headerOptions["Server"] = "LeonardoCustom/2.1 (Win64)";
 
 	std::string Head;
 	compileHeader(&headerOptions, &Head);
@@ -318,6 +320,25 @@ void HTTP_conn::compileMessage(const char* request, std::string* message, std::s
 }
 
 /**
+* given the raw header deconstruct it in a map with key : value
+*/
+std::map<std::string, std::string> HTTP_conn::decompileHeader(const char* rawHeader, size_t size) {
+	std::vector<std::string> options = split(std::string(rawHeader, size), "\n");
+	std::map<std::string, std::string> res;
+	std::vector<std::string> temp;
+
+	for (size_t i = 0; i < options.size(); i++) {
+		std::cout << options[i] << std::endl;
+		temp = split(options[i], ":");
+		if (temp.size() > 1) {
+			res[temp[0]] = temp[1];
+		}
+	}
+
+	return res;
+}
+
+/**
 * Query the database for the correct file type
 */
 std::string HTTP_conn::getContentType(std::string* filetype) {
@@ -331,23 +352,33 @@ std::string HTTP_conn::getContentType(std::string* filetype) {
 
 	Database_connection conn(&l_host, &l_uname, &l_pwd, &l_name);
 
-	// build query
-	std::string query = "SELECT * FROM types WHERE type LIKE '";
-	query += (*filetype).c_str();
-	query += "'";
+	// build query 1 no extra type
+	std::string query = "SELECT * FROM types WHERE type LIKE '" + *filetype + "'";
 
 	// execute query
 	sql::ResultSet* res;
 	sql::SQLString t = query.c_str();
 	res = conn.Query(&t);
 
-
 	// i only get the first result
 	std::string result;
 	if (res->next()) {
 		result = res->getString("content");
 	} else {
-		result = "text/plain";
+		// build query 2, anything before the type is accepted
+		query = "SELECT * FROM types WHERE type LIKE '%" + *filetype + "'";
+
+		// execute query
+		t = query.c_str();
+		res = conn.Query(&t);
+
+		// check first result
+		if (res->next()) {
+			result = res->getString("content");
+		} else {
+			// default type
+			result = "text/plain";
+		}
 	}
 
 	return result;
@@ -377,6 +408,26 @@ int HTTP_conn::sendResponse(SOCKET* clientSock, std::string* buff) {
 
 	int result = send(*clientSock, buff->c_str(), buff->size(), 0);
 	return result;
+}
+
+/**
+* Simply get the time formetted following RFC822 regulation on GMT time
+*/
+std::string HTTP_conn::getUTC() {
+
+	// Get the date in UTC/GMT
+	time_t unixtime;
+	tm UTC;
+	char buffer[80];
+
+	// set unix time on unixtime
+	time(&unixtime);
+	gmtime_s(&UTC, &unixtime);
+
+	// format based on rfc822 revision rfc1123
+	strftime(buffer, 80, "%a, %d %b %Y %H:%M:%S GMT", &UTC);
+
+	return std::string(buffer);
 }
 
 /**
