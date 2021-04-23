@@ -1,11 +1,40 @@
 #include "HTTP_conn.hpp"
-#include "DB_conn.hpp"
 
 #ifdef _DEBUG
 const char* server_init_file = "C:/Users/Leonardo/Desktop/workspace/vs-c++/TESI_MONTAGNER_MATURA/server_options.ini";
 #else
 const char* server_init_file = "../server_options.ini";
 #endif
+
+/*
+struct MemMan {
+	size_t memAlloc = 0;
+	size_t memDeAlloc = 0;
+
+	void getMemUsage() {
+		std::cout << memAlloc << " - " << memDeAlloc << " -> " << memAlloc - memDeAlloc << std::endl;
+	}
+
+	void resetMemUsage() {
+		memAlloc = 0;
+		memDeAlloc = 0;
+	}
+};
+
+static MemMan watcher;
+
+void* operator new(size_t size) {
+	watcher.memAlloc += size;
+
+	return malloc(size);
+}
+
+void operator delete (void* chunk, size_t size) {
+	watcher.memDeAlloc += size;
+
+	free(chunk);
+}
+*/
 
 /**
 * Decode url character (%20 => " ") to ascii character, NOT MINE, JUST COPY PASTED
@@ -156,15 +185,20 @@ SOCKET HTTP_conn::acceptClientSock() {
 	int claddr_size = sizeof(client_addr);
 	SOCKET result = accept(ListenSocket, &client_addr, &claddr_size);
 
+	// get the ip of the host 
 	if (result != INVALID_SOCKET) {
-		struct sockaddr_in* temp = (struct sockaddr_in*) &client_addr;
-		char* s = (char*) malloc(INET_ADDRSTRLEN);
+		sockaddr_in* temp = (struct sockaddr_in*) &client_addr;
+		char* s = (char*) new char[INET_ADDRSTRLEN];
 
 		if (s != nullptr) {
 			inet_ntop(AF_INET, &(temp->sin_addr), s, INET_ADDRSTRLEN);
 			std::cout << "\naccepted client : " << s << std::endl;
 		}
+
+		delete[] s;
+		temp = nullptr;
 	}
+
 	return result;
 }
 
@@ -176,7 +210,7 @@ void HTTP_conn::closeClientSock(SOCKET* clientSock) {
 	std::string temp;
 	int size;
 	while (true) {
-		size = receiveRequest(clientSock, &temp);
+		size = receiveRequest(clientSock, temp);
 		if (size <= 0) {
 			break;
 		}
@@ -185,6 +219,9 @@ void HTTP_conn::closeClientSock(SOCKET* clientSock) {
 	closesocket(*clientSock);
 }
 
+/**
+* close the communication from the server to the client
+*/
 void HTTP_conn::shutDown(SOCKET* clientSock) {
 	shutdown(*clientSock, SD_SEND);
 }
@@ -202,31 +239,111 @@ void HTTP_conn::create() {
 /**
 * format the header from the array to a string
 */
-void HTTP_conn::compileHeader(std::map<std::string, std::string>* headerOptions, std::string* result) {
-	std::string temp_result;
+void HTTP_conn::compileHeader(std::map<std::string, std::string>* headerOptions, std::string& result) {
+	result;
 
 	// Always the response code fisrt
-	temp_result += "HTTP/1.1 " + (*headerOptions)["HTTP/1.1"] + "\n";
+	result += "HTTP/1.1 " + (*headerOptions)["HTTP/1.1"] + "\n";
 
 	for (auto const& [key, val] : *headerOptions) {
 		// already wrote response code
 		if (key != "HTTP/1.1") {
 			// header option name :	header option value
-			temp_result += key + ": " + val + "\n";
+			result += key + ": " + val + "\n";
 		}
 	}
+}
 
-	// write the result on the given string
-	*result = temp_result;
+/**
+* the http method, set the value of result as the header that would have been sent in a GET response
+*/
+void HTTP_conn::HEAD(const char* filename, std::string& result) {
+
+	std::map<std::string, std::string> header;
+	composeHeader(filename, header);
+
+	// i know that i'm loading an entire file, if i find a better solution i'll use it
+	std::string content = getFile(filename);
+	header["Content-Lenght"] = std::to_string(content.length());
+
+	compileHeader(&header, result);
+
+}
+
+/**
+* get the file to a string and if its empty return the page 404.html
+*/
+std::string HTTP_conn::getFile(const char* file) {
+
+	// get the required file
+	std::fstream ifs(file, std::ios::binary | std::ios::in);
+
+	// read the file in one go to a string
+	//							start iterator							end iterator
+	std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
+
+
+	// if the file does not exist i load a default 404.html 
+	if (content.empty()) {
+		std::fstream ifs("404.html", std::ios::binary | std::ios::in);
+		std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
+	}
+
+	ifs.close();
+
+	return content;
+}
+
+/**
+* compose the header given the file requested
+*/
+void HTTP_conn::composeHeader(const char* filename, std::map<std::string, std::string>& result) {
+
+	// I use map to easily manage key : value, the only problem is when i compile the header, the response must be at the top
+
+	// requsted file actually exist
+	if (std::filesystem::exists(filename)) {
+
+		// status code OK
+		result["HTTP/1.1"] = "200 OK";
+
+		// get the file extension, i'll use it to get the content type
+		std::string temp = split(filename, ".").back();
+
+		// get the content type
+		std::string content_type;
+		getContentType(&temp, content_type);
+
+		// fallback if finds nothing
+		if (content_type == "") {
+			content_type = "text/plain";
+		}
+
+		// and actually add it in
+		result["Content-Type"] = content_type;
+
+	} else {
+		// status code Not Found
+		result["HTTP/1.1"] = "404 Not Found";
+		result["Content-Type"] = "text/html; charset=UTF-8";
+	}
+
+	// various header options
+
+	result["Date"] = getUTC();
+	result["Content-Encoding"] = "gzip";
+	result["Connection"] = "close";
+	result["Vary"] = "Accept-Encoding";
+	result["Server"] = "LeonardoCustom/2.1 (Win64)";
 }
 
 /**
 * Compose Header, read the requested file, compile the final message and set the given message as it
 */
-void HTTP_conn::compileMessage(const char* request, std::string* message, std::string* header = nullptr) {
+void HTTP_conn::compileMessage(const char* requestFile, std::string& result) {
 
 	// i use a string for compatibility and comodity
-	std::string Srequest = request;
+	std::string Srequest = requestFile;
 
 	// find the file requested
 	// GET ****** HTTP/ i need to get the (***) of unkown lenght, i skip GET and take a subtring from index 4 to index ?
@@ -244,6 +361,7 @@ void HTTP_conn::compileMessage(const char* request, std::string* message, std::s
 
 	// re set the filename as the base directory and the decoded filename
 	file = HTTP_Basedir + dst;
+	free(dst);
 
 	// usually to request index.html browsers does not specify it, they usually use /, if thats the case I scpecify index.html
 	// back access the last char of the string
@@ -255,68 +373,22 @@ void HTTP_conn::compileMessage(const char* request, std::string* message, std::s
 
 	// ------------------------------------------------------------------------------------------------ Start Compiling Header
 
-	// I use map to easily manage key : value, the only problem is when i compile the header, the response must be at the top
+	// get the header on a map, then complete it
 	std::map<std::string, std::string> headerOptions;
+	composeHeader(file.c_str(), headerOptions);
 
-	// get the required file
-	std::fstream ifs(file.c_str(), std::ios::binary | std::ios::in);
+	std::string body = getFile(file.c_str());
+	headerOptions["Content-Lenght"] = std::to_string(body.length());
 
-	// read the file in one go to a string
-	//							start iterator							end iterator
-	std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
+	std::string head;
+	compileHeader(&headerOptions, head);
 
-	// if the file does not exist i get an empty string
-	if (!content.empty()) {
+	std::cout << head << std::endl;
 
-		// requsted file exist
+	std::string gz_body;
+	compressGz(gz_body, body.c_str(), body.size());
 
-		// status code OK
-		headerOptions["HTTP/1.1"] = "200 OK";
-
-		// get the file extension, i'll use it to get the content type
-		std::string temp = split(file, ".").back();
-
-		// get the content type
-		std::string content_type = getContentType(&temp);
-		// fallback if finds nothing
-		if (content_type == "") {
-			content_type = "text/plain";
-		}
-
-		headerOptions["Content-Type"] = content_type;
-
-	} else {
-		// status code Not Found
-		headerOptions["HTTP/1.1"] = "404 Not Found";
-		headerOptions["Content-Type"] = "text/html; charset=UTF-8";
-		// get the missing page file, if there's no such file just send the header
-		std::fstream ifs("source/404.html", std::ios::binary | std::ios::in);
-
-		content = std::string((std::istreambuf_iterator<char>(ifs)),
-							  (std::istreambuf_iterator<char>()));
-	}
-
-	// various header options
-
-	headerOptions["Date"] = getUTC();
-	headerOptions["Content-Lenght"] = std::to_string(content.length());
-	headerOptions["Content-Encoding"] = "gzip";
-	headerOptions["Connection"] = "close";
-	headerOptions["Vary"] = "Accept-Encoding";
-	headerOptions["Server"] = "LeonardoCustom/2.1 (Win64)";
-
-	std::string Head;
-	compileHeader(&headerOptions, &Head);
-
-	std::string gz_content;
-	compressGz(gz_content, content.c_str(), content.size());
-
-	std::string SendString = Head + "\n" + gz_content;
-
-	if (header != nullptr) {
-		*header = Head;
-	}
-	*message = SendString;
+	result = head + "\n" + gz_body;
 }
 
 /**
@@ -328,8 +400,14 @@ std::map<std::string, std::string> HTTP_conn::decompileHeader(const char* rawHea
 	std::vector<std::string> temp;
 
 	for (size_t i = 0; i < options.size(); i++) {
-		std::cout << options[i] << std::endl;
+
 		temp = split(options[i], ":");
+		// first header option "METHOD file HTTP/version"
+		if (temp.size() < 2) {
+			temp = split(options[i], " ");
+		}
+
+		// the last header option is \n
 		if (temp.size() > 1) {
 			res[temp[0]] = temp[1];
 		}
@@ -341,27 +419,23 @@ std::map<std::string, std::string> HTTP_conn::decompileHeader(const char* rawHea
 /**
 * Query the database for the correct file type
 */
-std::string HTTP_conn::getContentType(std::string* filetype) {
-
+void HTTP_conn::getContentType(const std::string* filetype, std::string& result) {
+	result = "text/html";
 	// create connection
-	std::string host("tcp://" + DB_Host + ":" + DB_Port);
-	sql::SQLString l_host(host.c_str());
-	sql::SQLString l_uname(DB_Username.c_str());
-	sql::SQLString l_pwd(DB_Password.c_str());
-	sql::SQLString l_name(DB_Name.c_str());
+	sql::SQLString l_host("tcp://" + DB_Host + ":" + DB_Port);
 
-	Database_connection conn(&l_host, &l_uname, &l_pwd, &l_name);
+	Database_connection conn(&l_host, &DB_Username, &DB_Password, &DB_Name);
 
-	// build query 1 no extra type
-	std::string query = "SELECT * FROM types WHERE type LIKE '" + *filetype + "'";
+	// build query 1, don't accept anything but the exact match
+
+	sql::SQLString query = "SELECT * FROM types WHERE type LIKE '" + *filetype + "'";
+
 
 	// execute query
-	sql::ResultSet* res;
-	sql::SQLString t = query.c_str();
-	res = conn.Query(&t);
 
+	sql::ResultSet* res;
+	res = conn.Query(&query);
 	// i only get the first result
-	std::string result;
 	if (res->next()) {
 		result = res->getString("content");
 	} else {
@@ -369,8 +443,7 @@ std::string HTTP_conn::getContentType(std::string* filetype) {
 		query = "SELECT * FROM types WHERE type LIKE '%" + *filetype + "'";
 
 		// execute query
-		t = query.c_str();
-		res = conn.Query(&t);
+		res = conn.Query(&query);
 
 		// check first result
 		if (res->next()) {
@@ -381,24 +454,24 @@ std::string HTTP_conn::getContentType(std::string* filetype) {
 		}
 	}
 
-	return result;
+	free(res);
 }
 
 /**
 * copy the incoming message requested to buff and return the bytes received
 */
-int HTTP_conn::receiveRequest(SOCKET* clientSock, std::string* buff) {
+int HTTP_conn::receiveRequest(SOCKET* clientSock, std::string& result) {
 
 	char recvbuf[DEFAULT_BUFLEN];
 	// result is the amount of bytes received
 
-	int result = recv(*clientSock, recvbuf, DEFAULT_BUFLEN, 0);
-	if (result > 0) {
-		*buff = std::string(recvbuf, result);
+	int res = recv(*clientSock, recvbuf, DEFAULT_BUFLEN, 0);
+	if (res > 0) {
+		result = std::string(recvbuf, res);
 	} else {
-		*buff = "";
+		result = "";
 	}
-	return result;
+	return res;
 }
 
 /**
@@ -406,7 +479,7 @@ int HTTP_conn::receiveRequest(SOCKET* clientSock, std::string* buff) {
 */
 int HTTP_conn::sendResponse(SOCKET* clientSock, std::string* buff) {
 
-	int result = send(*clientSock, buff->c_str(), buff->size(), 0);
+	int result = send(*clientSock, buff->c_str(), (int) buff->size(), 0);
 	return result;
 }
 

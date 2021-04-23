@@ -1,5 +1,9 @@
 #include "DB_conn.hpp"
 
+Database_connection::~Database_connection() {
+	delete connection;
+}
+
 Database_connection::Database_connection(sql::SQLString* host, sql::SQLString* username, sql::SQLString* password, sql::SQLString* DBName) {
 	connect(host, username, password, DBName);
 }
@@ -10,7 +14,6 @@ Database_connection::Database_connection(sql::SQLString* host, sql::SQLString* u
 void Database_connection::connect(sql::SQLString* host, sql::SQLString* username, sql::SQLString* password, sql::SQLString* DBName) {
 
 	try {
-		driver = get_driver_instance();
 		// enstablish connection
 		connection = driver->connect(*host, *username, *password);
 		// use the given database
@@ -25,13 +28,19 @@ void Database_connection::connect(sql::SQLString* host, sql::SQLString* username
 */
 sql::ResultSet* Database_connection::Query(sql::SQLString* query) {
 
-	sql::ResultSet* res;
-	sql::Statement* stmt;
+	sql::ResultSet* res = nullptr;
+	sql::Statement* stmt = nullptr;
 
-	stmt = connection->createStatement();
-	res = stmt->executeQuery(*query);
-	delete stmt;
-	return res;
+	try {
+		stmt = connection->createStatement();
+		res = stmt->executeQuery(*query);
+		free(stmt);
+		return res;
+	} catch (std::exception e) {
+		std::cout << e.what() << std::endl;
+		free(stmt);
+		return nullptr;
+	}
 }
 
 /**
@@ -43,7 +52,7 @@ bool Database_connection::UQuery(sql::SQLString* query) {
 
 	stmt = connection->createStatement();
 	bool res = stmt->execute(*query);
-	delete stmt;
+	free(stmt);
 
 	return res;
 }

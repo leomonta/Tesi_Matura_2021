@@ -1,7 +1,6 @@
 #include <thread>
 #include <mutex>
 // my headers
-#include "DB_conn.hpp"
 #include "HTTP_conn.hpp"
 
 /**
@@ -34,6 +33,7 @@ int __cdecl main() {
 		if (client == INVALID_SOCKET) {
 			continue;
 		} else {
+			//resolveRequest(client, &http);
 			std::thread(resolveRequest, client, &http).detach();
 		}
 
@@ -63,20 +63,21 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 	int iSendResult;
 	std::string request;
 	std::string message;
-	std::string header;
+
+	#ifdef _DEBUG
+	// console color control
+	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	#endif
 
 	while (true) {
 
-		iResult = http_->receiveRequest(&clientSocket, &request);
+		iResult = http_->receiveRequest(&clientSocket, request);
 		http_->decompileHeader(request.c_str(), request.size());
 
 		// received some bytes
 		if (iResult > 0) {
 
 			#ifdef _DEBUG
-			// console color control
-			HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-
 			SetConsoleTextAttribute(hConsole, 10);
 			std::cout << "\nREQUEST ARRIVED---------------------------------------------------------------------------------------------------------------------" << std::endl;
 
@@ -94,7 +95,7 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 			// message compprehend both header and body
 			std::cout << "thread: " << clientSocket << std::endl;
 			#endif // _DEBUG
-			http_->compileMessage(request.c_str(), &message, &header);
+			http_->compileMessage(request.c_str(), message);
 
 			// acknowledge the segment back to the sender
 			iSendResult = http_->sendResponse(&clientSocket, &message);
@@ -111,9 +112,6 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 			SetConsoleTextAttribute(hConsole, 4);
 
 			std::cout << "Bytes sent: " << iSendResult << std::endl;
-
-			// print header 
-			std::cout << header.c_str() << std::endl;
 
 			SetConsoleTextAttribute(hConsole, 6);
 			std::cout << "\nREQUEST SATISFIED////////////////////////////////////////////////////////////////////\n\n\n\n\n" << std::endl;
@@ -141,5 +139,6 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 	mtx.lock();
 	std::cout << "thread for socket: " << clientSocket << " finished" << std::endl;
 	mtx.unlock();
+
 }
 

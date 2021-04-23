@@ -17,15 +17,14 @@
 #include <jdbc/cppconn/exception.h>
 #include <jdbc/cppconn/resultset.h>
 #include <jdbc/cppconn/statement.h>
-
-
 class Database_connection {
 private:
 	sql::Connection* connection;
-	sql::Driver* driver;
+	sql::Driver* driver = get_driver_instance();
 
 public:
 
+	~Database_connection();
 	Database_connection(sql::SQLString* host, sql::SQLString* username, sql::SQLString* password, sql::SQLString* DBName);
 	void connect(sql::SQLString* host, sql::SQLString* username, sql::SQLString* password, sql::SQLString* DBName);
 	sql::ResultSet* Query(sql::SQLString* query);
