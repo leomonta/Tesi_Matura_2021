@@ -156,13 +156,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\HTTP_message.cpp" />
     <ClCompile Include="src\DBconn.cpp" />
     <ClCompile Include="src\HTTP_conn.cpp" />
     <ClCompile Include="src\server.cpp" />
+    <ClCompile Include="src\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\HTTP_message.hpp" />
     <ClInclude Include="include\DB_conn.hpp" />
     <ClInclude Include="include\HTTP_conn.hpp" />
+    <ClInclude Include="include\profiler.hpp" />
+    <ClInclude Include="include\utils.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
