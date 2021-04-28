@@ -96,10 +96,3 @@ void HTTP_message::parseMethod(std::string& requestMethod) {
 		method = HTTP_PATCH;
 	}
 }
-
-/**
-* simply add the given key -> value pair to the headerOption map
-*/
-void HTTP_message::addHeaderOptions(std::string& key, std::string& value) {
-	headerOptions[key] = value;
-}

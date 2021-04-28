@@ -45,6 +45,5 @@ public:
 
 	HTTP_message(unsigned int dir = HTTP_OUTBOUND) : direction(dir) {};
 	HTTP_message(std::string& raw_message, unsigned int dir = HTTP_INBOUND);
-	void addHeaderOptions(std::string& key, std::string& value);
 };
 

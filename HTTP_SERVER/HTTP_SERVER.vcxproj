@@ -169,6 +169,9 @@
     <ClInclude Include="include\profiler.hpp" />
     <ClInclude Include="include\utils.hpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="res\Databases.sql" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

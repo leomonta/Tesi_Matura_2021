@@ -14,8 +14,7 @@ const char* server_init_file = "../server_options.ini";
 #endif
 /**
 * Todos: HTTP METHODS: POST, HEAD, and maybe PUT, OPTIONS,
-* Todos: multithreading, each accepted socket a thread
-* Todos: caching, keep in memory files
+* HTTPs: using ssl to encript trasmission
 */
 
 // Http Server
@@ -113,7 +112,14 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 			case HTTP_GET:
 				Get(mex, response);
 				break;
+
+			case HTTP_POST:
+				Post(mex, response);
+				break;
 			}
+
+			// make the message a single formatted string
+			response.compileMessage();
 
 			#ifdef _DEBUG
 			SetConsoleTextAttribute(hConsole, 10);
@@ -224,7 +230,6 @@ void readIni() {
 */
 void Head(HTTP_message& inbound, HTTP_message& outbound) {
 
-
 	char* dst = (char*) (inbound.filename.c_str());
 	urlDecode(dst, inbound.filename.c_str());
 
@@ -243,9 +248,7 @@ void Head(HTTP_message& inbound, HTTP_message& outbound) {
 	// i know that i'm loading an entire file, if i find a better solution i'll use it
 	std::string content = getFile(file.c_str());
 	outbound.headerOptions["Content-Lenght"] = std::to_string(content.length());
-
-	// make the message a single formatted string
-	outbound.compileMessage();
+	outbound.filename = file;
 }
 
 /**
@@ -253,22 +256,11 @@ void Head(HTTP_message& inbound, HTTP_message& outbound) {
 */
 void Get(HTTP_message& inbound, HTTP_message& outbound) {
 
-	char* dst = (char*) (inbound.filename.c_str());
-	urlDecode(dst, inbound.filename.c_str());
-
-	// re set the filename as the base directory and the decoded filename
-	std::string file = HTTP_Basedir + dst;
-
-	// usually to request index.html browsers does not specify it, they usually use /, if thats the case I scpecify index.html
-	// back access the last char of the string
-	if (file.back() == '/') {
-		file += "index.html";
-	}
-	// insert in the outbound message the necessaire header options, filename is used to determine the response code
-	composeHeader(file.c_str(), outbound.headerOptions);
+	// I just need to add the body to the head, 
+	Head(inbound, outbound);
 
 	// i know that i'm loading an entire file, if i find a better solution i'll use it
-	std::string content = getFile(file.c_str());
+	std::string content = getFile(outbound.filename.c_str());
 
 	std::string compressed;
 	compressGz(compressed, content.c_str(), content.length());
@@ -276,8 +268,6 @@ void Get(HTTP_message& inbound, HTTP_message& outbound) {
 	outbound.rawBody = compressed;
 
 	outbound.headerOptions["Content-Lenght"] = std::to_string(content.length());
-	// make the message a single formatted string
-	outbound.compileMessage();
 }
 
 /**
