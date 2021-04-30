@@ -1,6 +1,9 @@
 #include "HTTP_message.hpp"
 #include "utils.hpp"
 
+
+#include <iostream>
+
 HTTP_message::HTTP_message(std::string& raw_message, unsigned int dir) {
 	message = raw_message;
 	direction = dir;
@@ -17,7 +20,7 @@ void HTTP_message::decompileHeader() {
 
 	for (size_t i = 0; i < options.size(); i++) {
 
-		temp = split(options[i], ":");
+		temp = split(options[i], ": ");
 		// first header option "METHOD file HTTP/version"
 		if (temp.size() <= 1 && temp[0] != "") {
 
@@ -40,11 +43,95 @@ void HTTP_message::decompileHeader() {
 */
 void HTTP_message::decompileMessage() {
 	// body and header are divided by two newlines
-	std::vector<std::string> mex = split(message, "\r\n\r\n");
+	size_t pos = message.find("\r\n\r\n");
 
-	rawHeader = mex[0];
-	rawBody = mex[1];
+	rawHeader = message.substr(0, pos);
+	rawBody = message.substr(pos);
+
 	decompileHeader();
+	std::string divisor;
+	std::vector<std::string> datas;
+	std::vector<std::string> temp;
+
+	divisor = headerOptions["Content-Type"];
+
+	// the first four bytes are \r\n\r\n, i need to remove them
+	rawBody.erase(rawBody.begin(), rawBody.begin() + 4);
+
+	if (!divisor.empty()) {
+		// the fields are separated from each others with a "&" and key -> value are separated with "="
+		// plus they are encoded as a URL
+		if (divisor == "application/x-www-form-urlencoded") {
+			datas = split(rawBody, "&");
+
+			for (size_t i = 0; i < datas.size(); i++) {
+				// temp string to store the decoded value
+				char* dst = (char*) datas[i].c_str();
+				urlDecode(dst, datas[i].c_str());
+				//  0 |  1
+				// key=value
+				temp = split(dst, "=");
+
+				if (temp.size() >= 2) {
+					formData[temp[0]] = temp[1];
+				}
+
+			}
+		} else if (divisor == "text/plain") {
+			datas = split(rawBody, "\r\n");
+
+			// the last place always contains "--", no real data in here
+			datas.pop_back();
+			datas.erase(datas.begin());
+
+			for (size_t i = 0; i < datas.size(); i++) {
+				temp = split(datas[i], "=");
+
+				if (temp.size() >= 2) {
+					formData[temp[0]] = temp[1];
+				}
+
+			}
+		} else if (divisor.find("multipart/form-data;") != std::string::npos) {
+			divisor = "--" + split(divisor, "=")[1];
+			// sometimes the boundary is encolsed in quotes, take care of this case
+			if (divisor[0] == '"' && divisor.back() == '"') {
+				divisor.pop_back();
+				divisor.erase(divisor.begin());
+			}
+
+			datas = split(rawBody, divisor);
+
+			// the last place always contains "--", no real data in here
+			datas.pop_back();
+			datas.erase(datas.begin());
+
+			for (size_t i = 0; i < datas.size(); i++) {
+				/* 0  |                    1                        |    2   |  4   | 5  |
+				* \r\n|Content-Disposition: form-data; name="field1"|\r\n\r\n|value1|\r\n|
+				*/
+				std::vector<std::string> option_value = split(datas[i], "\r\n");
+				option_value.pop_back(); // pos 5
+				option_value.erase(option_value.begin() + 2); // pos 2
+				option_value.erase(option_value.begin()); // pos 0
+
+
+				//                0              ||      1      ||         2
+				// Content-Disposition: form-data; name="field1"; filename="example.txt"
+				std::vector<std::string> options = split(option_value[0], "; ");
+
+				// jump directly to "name="
+				std::string name = options[1].substr(5);
+				// remove heading and trailing double quotes " 
+				name.pop_back();
+				name.erase(name.begin());
+
+				formData[name] = option_value[1];
+
+			}
+		}
+
+	}
 }
 
 /**
