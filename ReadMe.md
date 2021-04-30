@@ -4,7 +4,7 @@
 #### __I hope it will be the best part of the interrogation__
 
 
-###The idea is this:
+### The idea is this:
 
 * I have a database containing different products from different suppliers, each supplier supply a specific product with a specific price,
 each product and supplier are invented and have randomly generated data.
