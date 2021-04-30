@@ -2,6 +2,7 @@
 #include <mutex>
 #include <filesystem>
 // my headers
+//#undef _DEBUG
 #include "HTTP_conn.hpp"
 #include "HTTP_message.hpp"
 #include "DB_conn.hpp"
@@ -35,6 +36,7 @@ void readIni();
 void resolveRequest(SOCKET clientSocket, HTTP_conn* http_);
 void Head(HTTP_message& inbound, HTTP_message& outbound);
 void Get(HTTP_message& inbound, HTTP_message& outbound);
+void Post(HTTP_message& inbound, HTTP_message& outbound);
 void composeHeader(const char* filename, std::map<std::string, std::string>& result);
 std::string getFile(const char* file);
 void getContentType(const std::string* filetype, std::string& result);
@@ -57,8 +59,8 @@ int __cdecl main() {
 		if (client == INVALID_SOCKET) {
 			continue;
 		} else {
-			//resolveRequest(client, &http);
-			std::thread(resolveRequest, client, &http).detach();
+			resolveRequest(client, &http);
+			//std::thread(resolveRequest, client, &http).detach();
 		}
 
 	}
@@ -123,16 +125,15 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 
 			#ifdef _DEBUG
 			SetConsoleTextAttribute(hConsole, 10);
-			std::cout << "\nREQUEST ARRIVED---------------------------------------------------------------------------------------------------------------------" << std::endl;
+			std::cout << "\nInbound request---------------------------------------------------------------------------------------------------------------------" << std::endl;
 
 			SetConsoleTextAttribute(hConsole, 2);
 			std::cout << "\nByes received: " << iResult << std::endl;
-			std::cout << request.c_str() << std::endl;
+			std::cout << mex.message.c_str() << std::endl;
 
 			SetConsoleTextAttribute(hConsole, 12);
 			std::cout << "\nHEADER SENT**************************************************************************" << std::endl;
 
-			std::cout << "thread: " << clientSocket << std::endl;
 			#endif // _DEBUG
 
 			// ------------------------------------------------------------------ SEND
@@ -151,6 +152,8 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 			SetConsoleTextAttribute(hConsole, 4);
 
 			std::cout << "Bytes sent: " << iSendResult << std::endl;
+
+			std::cout << response.message.c_str() << std::endl;
 
 			SetConsoleTextAttribute(hConsole, 6);
 			std::cout << "\nREQUEST SATISFIED////////////////////////////////////////////////////////////////////\n\n\n\n\n" << std::endl;
@@ -268,6 +271,18 @@ void Get(HTTP_message& inbound, HTTP_message& outbound) {
 	outbound.rawBody = compressed;
 
 	outbound.headerOptions["Content-Lenght"] = std::to_string(content.length());
+	outbound.headerOptions["Content-Encoding"] = "gzip";
+}
+
+/**
+* Now we get the to the hot stuff, this is where i put the important logic for the API
+*/
+void Post(HTTP_message& inbound, HTTP_message& outbound) {
+
+	Head(inbound, outbound);
+
+
+
 }
 
 /**
@@ -307,7 +322,6 @@ void composeHeader(const char* filename, std::map<std::string, std::string>& res
 	// various header options
 
 	result["Date"] = getUTC();
-	result["Content-Encoding"] = "gzip";
 	result["Connection"] = "close";
 	result["Vary"] = "Accept-Encoding";
 	result["Server"] = "LeonardoCustom/2.1 (Win64)";

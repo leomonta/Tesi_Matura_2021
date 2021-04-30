@@ -132,59 +132,6 @@ HTTP_conn::HTTP_conn(const char* basedir, const char* ip, const char* port) {
 }
 
 /**
-* Compose Header, read the requested file, compile the final message and set the given message as it
-*
-void HTTP_conn::compileMessage(const char* requestFile, std::string& result) {
-
-	// i use a string for compatibility and comodity
-	std::string Srequest = requestFile;
-
-	// find the file requested
-	// GET ****** HTTP/ i need to get the (***) of unkown lenght, i skip GET and take a subtring from index 4 to index ?
-
-	// need the end index of the file requested
-	size_t endIndex = Srequest.find("HTTP/");
-
-	// actually get the filename with the heading slash (/), -5 cus std::string::find return the index of the last char of the string given
-	// the problem is that thi filename might have url character unreadable from the fstream
-	std::string file = Srequest.substr(4, endIndex - 5);
-
-	// decode the url, (i need a char*, not a const char *)
-	char* dst = (char*) (file.c_str());
-	urlDecode(dst, file.c_str());
-
-	// re set the filename as the base directory and the decoded filename
-	file = HTTP_Basedir + dst;
-
-	// usually to request index.html browsers does not specify it, they usually use /, if thats the case I scpecify index.html
-	// back access the last char of the string
-	if (file.back() == '/') {
-		file += "index.html";
-	}
-
-	std::cout << "File requested: " << file << std::endl;
-
-	// ------------------------------------------------------------------------------------------------ Start Compiling Header
-
-	// get the header on a map, then complete it
-	std::map<std::string, std::string> headerOptions;
-	composeHeader(file.c_str(), headerOptions);
-
-	std::string body = getFile(file.c_str());
-	headerOptions["Content-Lenght"] = std::to_string(body.length());
-
-	std::string head;
-	compileHeader(&headerOptions, head);
-
-	std::cout << head << std::endl;
-
-	std::string gz_body;
-	compressGz(gz_body, body.c_str(), body.size());
-
-	result = head + "\n" + gz_body;
-}
-*/
-/**
 * copy the incoming message requested to buff and return the bytes received
 */
 int HTTP_conn::receiveRequest(SOCKET* clientSock, std::string& result) {
