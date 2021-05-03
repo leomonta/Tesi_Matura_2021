@@ -29,6 +29,8 @@ sql::SQLString DB_Username = "root";
 sql::SQLString DB_Password = "password";
 sql::SQLString DB_Name = "";
 
+Database_connection conn;
+
 // for controlling debug prints
 std::mutex mtx;
 
@@ -47,6 +49,11 @@ int __cdecl main() {
 	// initialize winsock and the server options
 	HTTP_conn http(HTTP_Basedir.c_str(), HTTP_IP.c_str(), HTTP_Port.c_str());
 
+	// create connection
+	sql::SQLString l_host("tcp://" + DB_Host + ":" + DB_Port);
+
+	conn.connect(&l_host, &DB_Username, &DB_Password, &DB_Name);
+
 	// used for controlling 
 	int iResult;
 	SOCKET client;
@@ -59,8 +66,8 @@ int __cdecl main() {
 		if (client == INVALID_SOCKET) {
 			continue;
 		} else {
-			resolveRequest(client, &http);
-			//std::thread(resolveRequest, client, &http).detach();
+			//resolveRequest(client, &http);
+			std::thread(resolveRequest, client, &http).detach();
 		}
 
 	}
@@ -356,10 +363,6 @@ std::string getFile(const char* file) {
 * Query the database for the correct file type
 */
 void getContentType(const std::string* filetype, std::string& result) {
-	// create connection
-	sql::SQLString l_host("tcp://" + DB_Host + ":" + DB_Port);
-
-	Database_connection conn(&l_host, &DB_Username, &DB_Password, &DB_Name);
 
 	// build query 1, don't accept anything but the exact match
 
@@ -368,7 +371,9 @@ void getContentType(const std::string* filetype, std::string& result) {
 	// execute query
 
 	sql::ResultSet* res;
+	mtx.lock();
 	res = conn.Query(&query);
+	mtx.unlock();
 	// i only get the first result
 	if (res->next()) {
 		result = res->getString("content");
@@ -388,5 +393,5 @@ void getContentType(const std::string* filetype, std::string& result) {
 		}
 	}
 
-	free(res);
+	delete res;
 }

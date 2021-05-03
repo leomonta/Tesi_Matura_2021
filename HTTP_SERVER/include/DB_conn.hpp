@@ -25,8 +25,9 @@ private:
 
 public:
 
-	~Database_connection();
+	inline Database_connection() {};
 	Database_connection(sql::SQLString* host, sql::SQLString* username, sql::SQLString* password, sql::SQLString* DBName);
+	~Database_connection();
 	void connect(sql::SQLString* host, sql::SQLString* username, sql::SQLString* password, sql::SQLString* DBName);
 	sql::ResultSet* Query(sql::SQLString* query);
 	bool UQuery(sql::SQLString* query);
