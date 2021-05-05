@@ -1,7 +1,7 @@
 # Project school for graduation
 
 ## I'm developing this project for my graduation on june 2021. I'll discuss this work on my exam
-#### __I hope it will be the best part of the interrogation__
+#### __I hope it will be the best part of the exam__
 
 
 ### The idea is this:
@@ -15,5 +15,20 @@ each product and supplier are invented and have randomly generated data.
 	* Maximum and Minimum price for the products
 	* Category / tag of the product
 	* part of the options of a product
+
+* API entries: _host_/
+	* products/?
+		* ID=_number_		the exact numeric value of the product id, it returns a single product
+		* tag=_string_		the exact tag string of the searched product, there can be multiple tags differentiated by a comme: tecnology, gaming, cpu
+		* search=_string_	a string containing part of the desired product name and options
+		* results=_number_	number of maximum results that will be returned
+		* supplier=_string_	a string containing part of the supplier name
+		* long=_bool_		true if with the product is needed all the info of the supplier, false if is acceptable just the supplier ID, default is false 
+	* suppliers/?
+		* ID=_number_		the exact numeric value of the  id, it returns a single supplier
+		* results=_number_	number of maximum results that will be returned
+		* search=_string_	a string containing part of the desired supplier name
+	* tags/?				if nothing passed return all tags
+		* search=_string_	a string containing part of the tag name
 
 > I also have a separate database for the mime types
