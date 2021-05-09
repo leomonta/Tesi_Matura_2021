@@ -1,7 +1,6 @@
 #include "HTTP_message.hpp"
 #include "utils.hpp"
 
-
 #include <iostream>
 
 HTTP_message::HTTP_message(std::string& raw_message, unsigned int dir) {
@@ -50,8 +49,6 @@ void HTTP_message::decompileMessage() {
 
 	decompileHeader();
 	std::string divisor;
-	std::vector<std::string> datas;
-	std::vector<std::string> temp;
 
 	divisor = headerOptions["Content-Type"];
 
@@ -62,37 +59,12 @@ void HTTP_message::decompileMessage() {
 		// the fields are separated from each others with a "&" and key -> value are separated with "="
 		// plus they are encoded as a URL
 		if (divisor == "application/x-www-form-urlencoded") {
-			datas = split(rawBody, "&");
-
-			for (size_t i = 0; i < datas.size(); i++) {
-				// temp string to store the decoded value
-				char* dst = (char*) datas[i].c_str();
-				urlDecode(dst, datas[i].c_str());
-				//  0 |  1
-				// key=value
-				temp = split(dst, "=");
-
-				if (temp.size() >= 2) {
-					formData[temp[0]] = temp[1];
-				}
-
-			}
+			parseQueryParameters(rawBody);
 		} else if (divisor == "text/plain") {
-			datas = split(rawBody, "\r\n");
-
-			// the last place always contains "--", no real data in here
-			datas.pop_back();
-			datas.erase(datas.begin());
-
-			for (size_t i = 0; i < datas.size(); i++) {
-				temp = split(datas[i], "=");
-
-				if (temp.size() >= 2) {
-					formData[temp[0]] = temp[1];
-				}
-
-			}
+			parsePlainParameters(rawBody);
 		} else if (divisor.find("multipart/form-data;") != std::string::npos) {
+
+			// find the divisor
 			divisor = "--" + split(divisor, "=")[1];
 			// sometimes the boundary is encolsed in quotes, take care of this case
 			if (divisor[0] == '"' && divisor.back() == '"') {
@@ -100,35 +72,7 @@ void HTTP_message::decompileMessage() {
 				divisor.erase(divisor.begin());
 			}
 
-			datas = split(rawBody, divisor);
-
-			// the last place always contains "--", no real data in here
-			datas.pop_back();
-			datas.erase(datas.begin());
-
-			for (size_t i = 0; i < datas.size(); i++) {
-				/* 0  |                    1                        |    2   |  4   | 5  |
-				* \r\n|Content-Disposition: form-data; name="field1"|\r\n\r\n|value1|\r\n|
-				*/
-				std::vector<std::string> option_value = split(datas[i], "\r\n");
-				option_value.pop_back(); // pos 5
-				option_value.erase(option_value.begin() + 2); // pos 2
-				option_value.erase(option_value.begin()); // pos 0
-
-
-				//                0              ||      1      ||         2
-				// Content-Disposition: form-data; name="field1"; filename="example.txt"
-				std::vector<std::string> options = split(option_value[0], "; ");
-
-				// jump directly to "name="
-				std::string name = options[1].substr(5);
-				// remove heading and trailing double quotes " 
-				name.pop_back();
-				name.erase(name.begin());
-
-				formData[name] = option_value[1];
-
-			}
+			parseFormData(rawBody, divisor);
 		}
 
 	}
@@ -181,5 +125,92 @@ void HTTP_message::parseMethod(std::string& requestMethod) {
 		method = HTTP_TRACE;
 	} else if (requestMethod == "PATCH") {
 		method = HTTP_PATCH;
+	}
+}
+
+/**
+* Given a string of urlencoded parameters parse and decode them, then insert them in the parameters map in the HTTP_message
+*/
+void HTTP_message::parseQueryParameters(std::string& params) {
+	std::vector<std::string> datas;
+	std::vector<std::string> temp;
+
+	// parameters may come from the body via POST or the url via GET
+	datas = split(params, "&");
+
+	for (size_t i = 0; i < datas.size(); i++) {
+		// temp string to store the decoded value
+		char* dst = (char*) datas[i].c_str();
+		urlDecode(dst, datas[i].c_str());
+		//  0 |  1
+		// key=value
+		temp = split(dst, "=");
+
+		if (temp.size() >= 2) {
+			parameters[temp[0]] = temp[1];
+		}
+
+	}
+}
+
+/**
+* Parse the data not encoded in form data and then insert them in the parameters map in the HTTP_message
+*/
+void HTTP_message::parsePlainParameters(std::string& params) {
+	std::vector<std::string> datas;
+	std::vector<std::string> temp;
+
+	datas = split(params, "\r\n");
+
+	// the last place always contains "--", no real data in here
+	datas.pop_back();
+	datas.erase(datas.begin());
+
+	for (size_t i = 0; i < datas.size(); i++) {
+		temp = split(datas[i], "=");
+
+		if (temp.size() >= 2) {
+			parameters[temp[0]] = temp[1];
+		}
+
+	}
+}
+
+/**
+* Parse the data divided by special divisor in form data and then insert them in the parameters map in the HTTP_message
+*/
+void HTTP_message::parseFormData(std::string& params, std::string& divisor) {
+
+	std::vector<std::string> datas;
+	std::vector<std::string> temp;
+
+	datas = split(params, divisor);
+
+	// the last place always contains "--", no real data in here
+	datas.pop_back();
+	datas.erase(datas.begin());
+
+	for (size_t i = 0; i < datas.size(); i++) {
+		/* 0  |                    1                        |    2   |  4   | 5  |
+		* \r\n|Content-Disposition: form-data; name="field1"|\r\n\r\n|value1|\r\n|
+		*/
+		std::vector<std::string> option_value = split(datas[i], "\r\n");
+		option_value.pop_back(); // pos 5
+		option_value.erase(option_value.begin() + 2); // pos 2
+		option_value.erase(option_value.begin()); // pos 0
+
+
+		//                0              ||      1      ||         2
+		// Content-Disposition: form-data; name="field1"; filename="example.txt"
+		std::vector<std::string> options = split(option_value[0], "; ");
+
+		// jump directly to "name="
+		std::string name = options[1].substr(5);
+		// remove heading and trailing double quotes " 
+		name.pop_back();
+		name.erase(name.begin());
+
+		parameters[name] = option_value[1];
+
 	}
 }

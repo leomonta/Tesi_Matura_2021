@@ -29,13 +29,16 @@ private:
 	void decompileMessage();
 	void compileHeader();
 	void parseMethod(std::string& requestMethod);
+	void parseQueryParameters(std::string& params);
+	void parsePlainParameters(std::string& params);
+	void parseFormData(std::string& params, std::string& divisor);
 
 public:
 
 	unsigned int direction; // 10 inboud, 11 outbound
 	unsigned int method; // the appropriate http method
 	std::map<std::string, std::string> headerOptions; // represent the header as the collection of the single options -> value
-	std::map<std::string, std::string> formData; // contain the data sent in the forms
+	std::map<std::string, std::string> parameters; // contain the data sent in the forms and query parameters
 	std::string rawHeader; // represent the header as a single single string
 	std::string rawBody; // represent the body as a single string
 	std::string message; // represent the entire http message as header + \r\n + body
