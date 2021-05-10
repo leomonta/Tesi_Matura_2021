@@ -7,6 +7,7 @@
 #include "HTTP_message.hpp"
 #include "DB_conn.hpp"
 #include "utils.hpp"
+#include "single_include/nlohmann/json.hpp"
 
 #ifdef _DEBUG
 const char* server_init_file = "C:/Users/Leonardo/Desktop/workspace/vs-c++/TESI_MONTAGNER_MATURA/server_options.ini";
@@ -14,8 +15,8 @@ const char* server_init_file = "C:/Users/Leonardo/Desktop/workspace/vs-c++/TESI_
 const char* server_init_file = "../server_options.ini";
 #endif
 /**
-* Todos: HTTP METHODS: POST, HEAD, and maybe PUT, OPTIONS,
-* HTTPs: using ssl to encript trasmission
+* Todos: http OPTIONS maybe PUT, OPTIONS,
+* HTTPS: using ssl to encript trasmission
 */
 
 // Http Server
@@ -39,6 +40,7 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_);
 void Head(HTTP_message& inbound, HTTP_message& outbound);
 void Get(HTTP_message& inbound, HTTP_message& outbound);
 void Post(HTTP_message& inbound, HTTP_message& outbound);
+void manageApi(HTTP_message& inbound, std::string& result);
 void composeHeader(const char* filename, std::map<std::string, std::string>& result);
 std::string getFile(const char* file);
 void getContentType(const std::string* filetype, std::string& result);
@@ -66,8 +68,10 @@ int __cdecl main() {
 		if (client == INVALID_SOCKET) {
 			continue;
 		} else {
-			//resolveRequest(client, &http);
-			std::thread(resolveRequest, client, &http).detach();
+			// make recv() function non blocking
+			//ioctlsocket(client, FIONBIO, 0);
+			resolveRequest(client, &http);
+			//std::thread(resolveRequest, client, &http).detach();
 		}
 
 	}
@@ -88,17 +92,17 @@ int __cdecl main() {
 
 void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 
-	mtx.lock();
-	std::cout << "thread for socket: " << clientSocket << " started" << std::endl;
-	mtx.unlock();
-
 	int iResult;
 	int iSendResult;
 
 	std::string request;
 	HTTP_message response;
 
-	#ifdef _DEBUG
+	#ifdef DEBUG_LOG
+	mtx.lock();
+	std::cout << "thread for socket: " << clientSocket << " started" << std::endl;
+	mtx.unlock();
+
 	// console color control
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	#endif
@@ -130,7 +134,7 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 			// make the message a single formatted string
 			response.compileMessage();
 
-			#ifdef _DEBUG
+			#ifdef DEBUG_LOG
 			SetConsoleTextAttribute(hConsole, 10);
 			std::cout << "\nInbound request---------------------------------------------------------------------------------------------------------------------" << std::endl;
 
@@ -141,7 +145,7 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 			SetConsoleTextAttribute(hConsole, 12);
 			std::cout << "\nHEADER SENT**************************************************************************" << std::endl;
 
-			#endif // _DEBUG
+			#endif // DEBUG_LOG
 
 			// ------------------------------------------------------------------ SEND
 			// acknowledge the segment back to the sender
@@ -155,7 +159,7 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 				break;
 			}
 
-			#ifdef _DEBUG
+			#ifdef DEBUG_LOG
 			SetConsoleTextAttribute(hConsole, 4);
 
 			std::cout << "Bytes sent: " << iSendResult << std::endl;
@@ -164,7 +168,7 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 
 			SetConsoleTextAttribute(hConsole, 6);
 			std::cout << "\nREQUEST SATISFIED////////////////////////////////////////////////////////////////////\n\n\n\n\n" << std::endl;
-			#endif // _DEBUG
+			#endif // DEBUG_LOG
 
 			http_->shutDown(&clientSocket);
 			break;
@@ -179,15 +183,18 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 			break;
 		}
 
+		// actually impossible cus recv block the thread for any communication
 		// nothing received, depend on the request
 		if (iResult == 0) {
 			break;
 		}
 	}
 
+	#ifdef DEBUG_LOG
 	mtx.lock();
 	std::cout << "thread for socket: " << clientSocket << " finished" << std::endl;
 	mtx.unlock();
+	#endif // DEBUG_LOG
 
 }
 
@@ -270,7 +277,8 @@ void Get(HTTP_message& inbound, HTTP_message& outbound) {
 	Head(inbound, outbound);
 
 	// i know that i'm loading an entire file, if i find a better solution i'll use it
-	std::string content = getFile(outbound.filename.c_str());
+	std::string content;// = getFile(outbound.filename.c_str());
+	manageApi(inbound, content);
 
 	std::string compressed;
 	compressGz(compressed, content.c_str(), content.length());
@@ -282,7 +290,7 @@ void Get(HTTP_message& inbound, HTTP_message& outbound) {
 }
 
 /**
-* Now we get the to the hot stuff, this is where i put the important logic for the API
+* Now we get the to the hot stuff, this is where i would put some logic, but i don't need it now
 */
 void Post(HTTP_message& inbound, HTTP_message& outbound) {
 
@@ -290,6 +298,18 @@ void Post(HTTP_message& inbound, HTTP_message& outbound) {
 
 
 
+}
+
+/**
+* the API logic is here
+*/
+void manageApi(HTTP_message& inbound, std::string& result) {
+
+	std::cout << "API endpoint = " << inbound.filename << std::endl;
+
+	std::cout << "query = " << inbound.parameters["v"] << std::endl;
+	std::cout << "query = " << inbound.parameters["t"] << std::endl;
+	std::cout << "query = " << inbound.parameters["g"] << std::endl;
 }
 
 /**

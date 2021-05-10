@@ -25,7 +25,13 @@ void HTTP_message::decompileHeader() {
 
 			temp = split(options[i], " ");
 			parseMethod(temp[0]);
-			filename = temp[1];
+			if (temp[1].find("?") != std::string::npos) {
+				std::vector<std::string> query = split(temp[1], "?");
+				filename = query[0];
+				parseQueryParameters(query[1]);
+			} else {
+				filename = temp[1];
+			}
 			HTTP_version = temp[2];
 		}
 
