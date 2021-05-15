@@ -40,10 +40,15 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_);
 void Head(HTTP_message& inbound, HTTP_message& outbound);
 void Get(HTTP_message& inbound, HTTP_message& outbound);
 void Post(HTTP_message& inbound, HTTP_message& outbound);
-void manageApi(HTTP_message& inbound, std::string& result);
+bool manageApi(HTTP_message& inbound, HTTP_message& result);
 void composeHeader(const char* filename, std::map<std::string, std::string>& result);
 std::string getFile(const char* file);
+
+// DB - interfacing function
 void getContentType(const std::string* filetype, std::string& result);
+void getProduct();
+void getSupplier();
+void getTag();
 
 int __cdecl main() {
 
@@ -277,15 +282,17 @@ void Get(HTTP_message& inbound, HTTP_message& outbound) {
 	Head(inbound, outbound);
 
 	// i know that i'm loading an entire file, if i find a better solution i'll use it
-	std::string content;// = getFile(outbound.filename.c_str());
-	manageApi(inbound, content);
+	// 
+	if (!manageApi(inbound, outbound)) {
+		outbound.rawBody = getFile(outbound.filename.c_str());
+	}
 
 	std::string compressed;
-	compressGz(compressed, content.c_str(), content.length());
+	compressGz(compressed, outbound.rawBody.c_str(), outbound.rawBody.length());
 	// set the content of the message
 	outbound.rawBody = compressed;
 
-	outbound.headerOptions["Content-Lenght"] = std::to_string(content.length());
+	outbound.headerOptions["Content-Lenght"] = std::to_string(compressed.length());
 	outbound.headerOptions["Content-Encoding"] = "gzip";
 }
 
@@ -302,14 +309,84 @@ void Post(HTTP_message& inbound, HTTP_message& outbound) {
 
 /**
 * the API logic is here
+* Todo: check boolean logic for the satabase
 */
-void manageApi(HTTP_message& inbound, std::string& result) {
+bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 
 	std::cout << "API endpoint = " << inbound.filename << std::endl;
 
-	std::cout << "query = " << inbound.parameters["v"] << std::endl;
-	std::cout << "query = " << inbound.parameters["t"] << std::endl;
-	std::cout << "query = " << inbound.parameters["g"] << std::endl;
+	sql::SQLString query = "SELECT * FROM";
+
+	int type = 0;
+
+	if (inbound.filename == "/products" || inbound.filename == "/products/") {
+		type = 1;
+		query += " prodotti WHERE 1=1";
+	} else if (inbound.filename == "/suppliers" || inbound.filename == "/suppliers/") {
+		type = 2;
+		query += " fornitori WHERE 1=1";
+	} else if (inbound.filename == "/tags" || inbound.filename == "/tags/") {
+		type = 3;
+		query += " categorie WHERE 1=1";
+	}
+
+	std::string result;
+	for (auto const& [key, value] : inbound.parameters) {
+
+		switch (type) {
+
+		case 1:
+			if (key == "ID" and value != "-1") {
+				query += " and ID_prodotto=" + value;
+				break; // if I have the id i don't need to search for anything else
+			}
+
+			if (key == "tag") {
+				query += " and categoria='" + value + "'";
+			}
+
+			if (key == "search") {
+				query += " and (nome LIKE '%" + value + "%' or opzioni LIKE '%" + value + "%')";
+			}
+
+			break;
+
+		case 2:
+			break;
+
+		case 3:
+			break;
+		}
+	}
+
+	if (inbound.parameters["results"] >= "0") {
+		query += " LIMIT " + inbound.parameters["results"];
+	} else {
+		query += "LIMIT 1";
+	}
+
+	std::cout << query << std::endl;
+
+	// the api is not required
+	if (type > 0) {
+		sql::ResultSet* res;
+
+		mtx.lock();
+		res = conn.Query(&query);
+		mtx.unlock();
+
+		if (res != nullptr && res->next()) {
+			result = res->getString("nome");
+			std::cout << result << std::endl;
+			outbound.rawBody = result;
+
+			outbound.headerOptions["HTTP/1.1"] = "200 OK";
+			outbound.headerOptions["Content-Type"] = "text/plain";
+			return true;
+		}
+	}
+	return false;
+
 }
 
 /**

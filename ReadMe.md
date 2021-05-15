@@ -21,7 +21,7 @@ each product and supplier are invented and have randomly generated data.
 		* ID=_number_		the exact numeric value of the product id, it returns a single product
 		* tag=_string_		the exact tag string of the searched product, there can be multiple tags differentiated by a comme: tecnology, gaming, cpu
 		* search=_string_	a string containing part of the desired product name and options
-		* results=_number_	number of maximum results that will be returned
+		* results=_number_	number of maximum results that will be returned if nothing provided return only one result
 		* supplier=_string_	a string containing part of the supplier name
 		* long=_bool_		true if with the product is needed all the info of the supplier, false if is acceptable just the supplier ID, default is false 
 	* suppliers/?
@@ -30,5 +30,6 @@ each product and supplier are invented and have randomly generated data.
 		* search=_string_	a string containing part of the desired supplier name
 	* tags/?				if nothing passed return all tags
 		* search=_string_	a string containing part of the tag name
+		* results=_number_	number of maximum results that will be returned
 
 > I also have a separate database for the mime types
