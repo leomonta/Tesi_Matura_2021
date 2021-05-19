@@ -23,11 +23,13 @@ each product and supplier are invented and have randomly generated data.
 		* search=_string_	a string containing part of the desired product name and options
 		* results=_number_	number of maximum results that will be returned if nothing provided return only one result
 		* supplier=_string_	a string containing part of the supplier name
+		* maxPrice=_number_	maximun acceptable price of the product
+		* minPrice=_number_	minimum acceptable price of the product
 		* long=_bool_		true if with the product is needed all the info of the supplier, false if is acceptable just the supplier ID, default is false 
 	* suppliers/?
 		* ID=_number_		the exact numeric value of the  id, it returns a single supplier
 		* results=_number_	number of maximum results that will be returned
-		* search=_string_	a string containing part of the desired supplier name
+		* search=_string_	a string containing part of the supplier name
 	* tags/?				if nothing passed return all tags
 		* search=_string_	a string containing part of the tag name
 		* results=_number_	number of maximum results that will be returned
