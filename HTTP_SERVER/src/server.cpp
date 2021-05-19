@@ -46,9 +46,8 @@ std::string getFile(const char* file);
 
 // DB - interfacing function
 void getContentType(const std::string* filetype, std::string& result);
-void getProduct();
-void getSupplier();
-void getTag();
+std::string getSupplier(std::string name, std::string max_res, std::string ID = "0");
+std::string getTag(std::string name, std::string max_res);
 
 int __cdecl main() {
 
@@ -321,7 +320,7 @@ bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 
 	if (inbound.filename == "/products" || inbound.filename == "/products/") {
 		type = 1;
-		query += " prodotti WHERE 1=1";
+		query += " prodotti JOIN prodotti_fornitori USING(ID_prodotto) JOIN fornitori USING(ID_fornitore) WHERE 1=1";
 	} else if (inbound.filename == "/suppliers" || inbound.filename == "/suppliers/") {
 		type = 2;
 		query += " fornitori WHERE 1=1";
@@ -341,20 +340,39 @@ bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 				break; // if I have the id i don't need to search for anything else
 			}
 
-			if (key == "tag") {
+			if (key == "tag" && !value.empty()) {
 				query += " and categoria='" + value + "'";
 			}
 
 			if (key == "search") {
-				query += " and (nome LIKE '%" + value + "%' or opzioni LIKE '%" + value + "%')";
+				query += " and (prodotti.nome LIKE '%" + value + "%' or prodotti.opzioni LIKE '%" + value + "%')";
+			}
+
+			if (key == "long") {
+			}
+
+			if (key == "supplier") {
+
 			}
 
 			break;
 
 		case 2:
+			if (key == "ID" and value != "-1") {
+				query += " and ID_fornitore=" + value;
+				break; // if I have the id i don't need to search for anything else
+			}
+
+			if (key == "search") {
+				query += " and nome_azienda LIKE '%" + value + "%' ";
+			}
 			break;
 
 		case 3:
+
+			if (key == "search") {
+				query += " and nome LIKE '%" + value + "%' ";
+			}
 			break;
 		}
 	}
@@ -367,7 +385,7 @@ bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 
 	std::cout << query << std::endl;
 
-	// the api is not required
+	// check if the api is not required
 	if (type > 0) {
 		sql::ResultSet* res;
 
@@ -375,17 +393,48 @@ bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 		res = conn.Query(&query);
 		mtx.unlock();
 
-		if (res != nullptr && res->next()) {
-			result = res->getString("nome");
-			std::cout << result << std::endl;
-			outbound.rawBody = result;
-
-			outbound.headerOptions["HTTP/1.1"] = "200 OK";
-			outbound.headerOptions["Content-Type"] = "text/plain";
-			return true;
+		while (res != nullptr && res->next()) {
+			for (unsigned int i = 1; i < res->getMetaData()->getColumnCount(); i++) {
+				result += res->getString(i) + " : ";
+			}
+			result += "\n";
 		}
+		std::cout << result << std::endl;
+		outbound.rawBody = result;
+
+		outbound.headerOptions["HTTP/1.1"] = "200 OK";
+		outbound.headerOptions["Content-Type"] = "text/plain";
+		return true;
 	}
 	return false;
+
+}
+
+std::string getSupplier(std::string name, std::string max_res, std::string ID) {
+
+	std::string result;
+	sql::SQLString query;
+	sql::SQLString limit = "LIMIT " + max_res + ";";
+
+	if (ID != "0") {
+		query += "SELECT * FROM fornitori WHERE ID=" + ID + limit;
+	} else {
+		query += "SELECT * FROM fornitori WHERE nome LIKE '%" + name + "%'" + limit;
+	}
+
+
+	sql::ResultSet* res;
+
+	mtx.lock();
+	res = conn.Query(&query);
+	mtx.unlock();
+
+	if (res != nullptr && res->next()) {
+		result = res->getString("ID");
+	}
+
+	std::cout << result << std::endl;
+	return result;
 
 }
 
