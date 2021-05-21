@@ -9,6 +9,8 @@
 #include "utils.hpp"
 #include "single_include/nlohmann/json.hpp"
 
+using json = nlohmann::json;
+
 #ifdef _DEBUG
 const char* server_init_file = "C:/Users/Leonardo/Desktop/workspace/vs-c++/TESI_MONTAGNER_MATURA/server_options.ini";
 #else
@@ -44,10 +46,20 @@ bool manageApi(HTTP_message& inbound, HTTP_message& result);
 void composeHeader(const char* filename, std::map<std::string, std::string>& result);
 std::string getFile(const char* file);
 
+// create a json string from data got from the given query
+std::string getJSONProduct(sql::SQLString& query, bool full_data);
+std::string getJSONSupplier(sql::SQLString& query);
+std::string getJSONTag(sql::SQLString& query);
+
+// columns name grouped for the json formatter
+sql::SQLString prod_cols[] = {"name", "options", "tag", "ID_product", "price", "quantity"};
+sql::SQLString supp_cols[] = {"company_name", "email", "website", "ID_supplier", "place"};
+sql::SQLString tags_cols[] = {"name"};
+sql::SQLString plac_cols[] = {"country", "region", "city", "street", "number"};
+
+
 // DB - interfacing function
 void getContentType(const std::string* filetype, std::string& result);
-std::string getSupplier(std::string name, std::string max_res, std::string ID = "0");
-std::string getTag(std::string name, std::string max_res);
 
 int __cdecl main() {
 
@@ -308,7 +320,6 @@ void Post(HTTP_message& inbound, HTTP_message& outbound) {
 
 /**
 * the API logic is here
-* Todo: check boolean logic for the satabase
 */
 bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 
@@ -317,61 +328,67 @@ bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 	sql::SQLString query = "SELECT * FROM";
 
 	int type = 0;
+	bool full_data = false;
 
 	if (inbound.filename == "/products" || inbound.filename == "/products/") {
 		type = 1;
-		query += " prodotti JOIN prodotti_fornitori USING(ID_prodotto) JOIN fornitori USING(ID_fornitore) WHERE 1=1";
+		query += " products JOIN product_supplier USING(ID_product) JOIN suppliers USING(ID_supplier) JOIN places USING(ID_place) WHERE 1=1";
 	} else if (inbound.filename == "/suppliers" || inbound.filename == "/suppliers/") {
 		type = 2;
-		query += " fornitori WHERE 1=1";
+		query += " suppliers JOIN places USING(ID_place) WHERE 1=1";
 	} else if (inbound.filename == "/tags" || inbound.filename == "/tags/") {
 		type = 3;
-		query += " categorie WHERE 1=1";
+		query += " tags WHERE 1=1";
 	}
 
-	std::string result;
+	// create the query
+	// TODO: check for price amount
 	for (auto const& [key, value] : inbound.parameters) {
 
 		switch (type) {
 
 		case 1:
 			if (key == "ID" and value != "-1") {
-				query += " and ID_prodotto=" + value;
+				query += " and ID_product=" + value;
 				break; // if I have the id i don't need to search for anything else
 			}
 
 			if (key == "tag" && !value.empty()) {
-				query += " and categoria='" + value + "'";
+				query += " and tag='" + value + "'";
 			}
 
 			if (key == "search") {
-				query += " and (prodotti.nome LIKE '%" + value + "%' or prodotti.opzioni LIKE '%" + value + "%')";
+				query += " and (products.name LIKE '%" + value + "%' or products.options LIKE '%" + value + "%')";
 			}
 
-			if (key == "long") {
+			if (key == "long" && value == "true") {
+				full_data = true;
 			}
 
-			if (key == "supplier") {
-
+			if (key == "minPrice") {
+				query += " and price > " + value;
 			}
 
+			if (key == "maxPrice") {
+				query += " and price < " + value;
+			}
 			break;
 
 		case 2:
 			if (key == "ID" and value != "-1") {
-				query += " and ID_fornitore=" + value;
+				query += " and ID_supplier=" + value;
 				break; // if I have the id i don't need to search for anything else
 			}
 
 			if (key == "search") {
-				query += " and nome_azienda LIKE '%" + value + "%' ";
+				query += " and company_name LIKE '%" + value + "%' ";
 			}
 			break;
 
 		case 3:
 
 			if (key == "search") {
-				query += " and nome LIKE '%" + value + "%' ";
+				query += " and name LIKE '%" + value + "%' ";
 			}
 			break;
 		}
@@ -385,56 +402,28 @@ bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 
 	std::cout << query << std::endl;
 
-	// check if the api is not required
-	if (type > 0) {
-		sql::ResultSet* res;
-
-		mtx.lock();
-		res = conn.Query(&query);
-		mtx.unlock();
-
-		while (res != nullptr && res->next()) {
-			for (unsigned int i = 1; i < res->getMetaData()->getColumnCount(); i++) {
-				result += res->getString(i) + " : ";
-			}
-			result += "\n";
-		}
-		std::cout << result << std::endl;
-		outbound.rawBody = result;
-
-		outbound.headerOptions["HTTP/1.1"] = "200 OK";
-		outbound.headerOptions["Content-Type"] = "text/plain";
-		return true;
-	}
-	return false;
-
-}
-
-std::string getSupplier(std::string name, std::string max_res, std::string ID) {
-
 	std::string result;
-	sql::SQLString query;
-	sql::SQLString limit = "LIMIT " + max_res + ";";
+	switch (type) {
 
-	if (ID != "0") {
-		query += "SELECT * FROM fornitori WHERE ID=" + ID + limit;
-	} else {
-		query += "SELECT * FROM fornitori WHERE nome LIKE '%" + name + "%'" + limit;
+	case 1:
+		result = getJSONProduct(query, full_data);
+		break;
+	case 2:
+		result = getJSONSupplier(query);
+		break;
+	case 3:
+		result = getJSONTag(query);
+		break;
+	default:
+		return false;
 	}
 
-
-	sql::ResultSet* res;
-
-	mtx.lock();
-	res = conn.Query(&query);
-	mtx.unlock();
-
-	if (res != nullptr && res->next()) {
-		result = res->getString("ID");
-	}
-
+	outbound.rawBody = result;
+	outbound.headerOptions["HTTP/1.1"] = "200 OK";
+	outbound.headerOptions["Content-Type"] = "application/json";
 	std::cout << result << std::endl;
-	return result;
+
+	return true;
 
 }
 
@@ -540,4 +529,128 @@ void getContentType(const std::string* filetype, std::string& result) {
 	}
 
 	delete res;
+}
+
+/**
+* Format the query result with or without the full supplier data
+*/
+std::string getJSONProduct(sql::SQLString& query, bool full_data) {
+
+	json root;
+
+	json products = json::array();
+
+	json single_product = json::object();
+	json supplier = json::object();
+	json place = json::object();
+
+	sql::ResultSet* res;
+	mtx.lock();
+	res = conn.Query(&query);
+	mtx.unlock();
+
+	using DTypes = sql::DataType;
+
+	while (res != nullptr && res->next()) {
+
+		single_product[prod_cols[0]] = res->getString(prod_cols[0]);
+		single_product[prod_cols[1]] = res->getString(prod_cols[1]);
+		single_product[prod_cols[2]] = res->getString(prod_cols[2]);
+
+		single_product[prod_cols[3]] = res->getInt(prod_cols[3]);
+		single_product[prod_cols[4]] = res->getDouble(prod_cols[4]);
+		single_product[prod_cols[5]] = res->getInt(prod_cols[5]);
+
+		if (full_data) {
+			supplier[supp_cols[0]] = res->getString(supp_cols[0]);
+			supplier[supp_cols[1]] = res->getString(supp_cols[1]);
+			supplier[supp_cols[2]] = res->getString(supp_cols[2]);
+			supplier[supp_cols[3]] = res->getInt(supp_cols[3]);
+
+			place[plac_cols[0]] = res->getString(plac_cols[0]);
+			place[plac_cols[1]] = res->getString(plac_cols[1]);
+			place[plac_cols[2]] = res->getString(plac_cols[2]);
+			place[plac_cols[3]] = res->getInt(plac_cols[3]);
+			place[plac_cols[4]] = res->getInt(plac_cols[4]);
+
+			supplier["place"] = place;
+			single_product["supplier"] = supplier;
+
+
+		} else {
+			single_product["supplier"] = res->getInt(supp_cols[3]);
+		}
+
+		products.push_back(single_product);
+	}
+
+	root["products"] = products;
+
+	return root.dump(4);
+
+}
+
+std::string getJSONTag(sql::SQLString& query) {
+
+	json root;
+
+	json tags = json::array();
+
+
+	sql::ResultSet* res;
+	mtx.lock();
+	res = conn.Query(&query);
+	mtx.unlock();
+
+	using DTypes = sql::DataType;
+
+	while (res != nullptr && res->next()) {
+		tags.push_back(res->getString(tags_cols[0]));
+	}
+
+	root["tags"] = tags;
+
+	std::cout << std::setw(4) << root << std::endl;
+	return root.dump(4);
+
+}
+
+std::string getJSONSupplier(sql::SQLString& query) {
+
+	json root;
+
+	json suppliers = json::array();
+
+	json single_supplier = json::object();
+	json place = json::object();
+
+	sql::ResultSet* res;
+	mtx.lock();
+	res = conn.Query(&query);
+	mtx.unlock();
+
+	using DTypes = sql::DataType;
+
+	while (res != nullptr && res->next()) {
+
+		single_supplier[supp_cols[0]] = res->getString(supp_cols[0]);
+		single_supplier[supp_cols[1]] = res->getString(supp_cols[1]);
+		single_supplier[supp_cols[2]] = res->getString(supp_cols[2]);
+		single_supplier[supp_cols[3]] = res->getInt(supp_cols[3]);
+
+		place[plac_cols[0]] = res->getString(plac_cols[0]);
+		place[plac_cols[1]] = res->getString(plac_cols[1]);
+		place[plac_cols[2]] = res->getString(plac_cols[2]);
+		place[plac_cols[3]] = res->getInt(plac_cols[3]);
+		place[plac_cols[4]] = res->getInt(plac_cols[4]);
+
+		single_supplier["place"] = place;
+		suppliers.push_back(single_supplier);
+	}
+
+	root["suppliers"] = suppliers;
+
+	std::cout << std::setw(4) << root << std::endl;
+	return root.dump(4);
+
 }

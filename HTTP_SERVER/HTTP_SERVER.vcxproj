@@ -157,7 +157,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\HTTP_message.cpp" />
-    <ClCompile Include="src\DBconn.cpp" />
+    <ClCompile Include="src\DBconn.cpp">
+      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Level3</WarningLevel>
+      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Level3</WarningLevel>
+      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Level3</WarningLevel>
+      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Level3</WarningLevel>
+    </ClCompile>
     <ClCompile Include="src\HTTP_conn.cpp" />
     <ClCompile Include="src\server.cpp" />
     <ClCompile Include="src\utils.cpp" />
