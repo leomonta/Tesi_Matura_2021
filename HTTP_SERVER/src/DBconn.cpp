@@ -29,16 +29,14 @@ void Database_connection::connect(sql::SQLString* host, sql::SQLString* username
 sql::ResultSet* Database_connection::Query(sql::SQLString* query) {
 
 	sql::ResultSet* res = nullptr;
-	sql::Statement* stmt = nullptr;
 
 	try {
-		stmt = connection->createStatement();
+		sql::Statement* stmt = connection->createStatement();
 		res = stmt->executeQuery(*query);
-		free(stmt);
+		delete stmt;
 		return res;
 	} catch (std::exception e) {
 		std::cout << e.what() << std::endl;
-		free(stmt);
 		return nullptr;
 	}
 }

@@ -17,8 +17,7 @@ const char* server_init_file = "C:/Users/Leonardo/Desktop/workspace/vs-c++/TESI_
 const char* server_init_file = "../server_options.ini";
 #endif
 /**
-* Todos: http OPTIONS maybe PUT, OPTIONS,
-* HTTPS: using ssl to encript trasmission
+* TODO: using ssl to encript trasmission
 */
 
 // Http Server
@@ -41,7 +40,6 @@ void readIni();
 void resolveRequest(SOCKET clientSocket, HTTP_conn* http_);
 void Head(HTTP_message& inbound, HTTP_message& outbound);
 void Get(HTTP_message& inbound, HTTP_message& outbound);
-void Post(HTTP_message& inbound, HTTP_message& outbound);
 bool manageApi(HTTP_message& inbound, HTTP_message& result);
 void composeHeader(const char* filename, std::map<std::string, std::string>& result);
 std::string getFile(const char* file);
@@ -84,8 +82,6 @@ int __cdecl main() {
 		if (client == INVALID_SOCKET) {
 			continue;
 		} else {
-			// make recv() function non blocking
-			//ioctlsocket(client, FIONBIO, 0);
 			resolveRequest(client, &http);
 			//std::thread(resolveRequest, client, &http).detach();
 		}
@@ -114,15 +110,6 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 	std::string request;
 	HTTP_message response;
 
-	#ifdef DEBUG_LOG
-	mtx.lock();
-	std::cout << "thread for socket: " << clientSocket << " started" << std::endl;
-	mtx.unlock();
-
-	// console color control
-	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-	#endif
-
 	while (true) {
 
 		// ---------------------------------------------------------------------- RECEIVE
@@ -133,6 +120,7 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 
 			HTTP_message mex(request);
 
+			// no really used 
 			switch (mex.method) {
 			case HTTP_HEAD:
 				Head(mex, response);
@@ -142,26 +130,10 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 				Get(mex, response);
 				break;
 
-			case HTTP_POST:
-				Post(mex, response);
-				break;
 			}
 
 			// make the message a single formatted string
 			response.compileMessage();
-
-			#ifdef DEBUG_LOG
-			SetConsoleTextAttribute(hConsole, 10);
-			std::cout << "\nInbound request---------------------------------------------------------------------------------------------------------------------" << std::endl;
-
-			SetConsoleTextAttribute(hConsole, 2);
-			std::cout << "\nByes received: " << iResult << std::endl;
-			std::cout << mex.message.c_str() << std::endl;
-
-			SetConsoleTextAttribute(hConsole, 12);
-			std::cout << "\nHEADER SENT**************************************************************************" << std::endl;
-
-			#endif // DEBUG_LOG
 
 			// ------------------------------------------------------------------ SEND
 			// acknowledge the segment back to the sender
@@ -174,17 +146,6 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 				WSACleanup();
 				break;
 			}
-
-			#ifdef DEBUG_LOG
-			SetConsoleTextAttribute(hConsole, 4);
-
-			std::cout << "Bytes sent: " << iSendResult << std::endl;
-
-			std::cout << response.message.c_str() << std::endl;
-
-			SetConsoleTextAttribute(hConsole, 6);
-			std::cout << "\nREQUEST SATISFIED////////////////////////////////////////////////////////////////////\n\n\n\n\n" << std::endl;
-			#endif // DEBUG_LOG
 
 			http_->shutDown(&clientSocket);
 			break;
@@ -205,12 +166,6 @@ void resolveRequest(SOCKET clientSocket, HTTP_conn* http_) {
 			break;
 		}
 	}
-
-	#ifdef DEBUG_LOG
-	mtx.lock();
-	std::cout << "thread for socket: " << clientSocket << " finished" << std::endl;
-	mtx.unlock();
-	#endif // DEBUG_LOG
 
 }
 
@@ -308,41 +263,35 @@ void Get(HTTP_message& inbound, HTTP_message& outbound) {
 }
 
 /**
-* Now we get the to the hot stuff, this is where i would put some logic, but i don't need it now
-*/
-void Post(HTTP_message& inbound, HTTP_message& outbound) {
-
-	Head(inbound, outbound);
-
-
-
-}
-
-/**
 * the API logic is here
 */
 bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 
-	std::cout << "API endpoint = " << inbound.filename << std::endl;
-
-	sql::SQLString query = "SELECT * FROM";
 
 	int type = 0;
 	bool full_data = false;
 
+	sql::SQLString query;
+
 	if (inbound.filename == "/products" || inbound.filename == "/products/") {
 		type = 1;
-		query += " products JOIN product_supplier USING(ID_product) JOIN suppliers USING(ID_supplier) JOIN places USING(ID_place) WHERE 1=1";
+		query = "SELECT * FROM products JOIN product_supplier USING(ID_product) JOIN suppliers USING(ID_supplier) JOIN places USING(ID_place) WHERE 1=1";
+
 	} else if (inbound.filename == "/suppliers" || inbound.filename == "/suppliers/") {
 		type = 2;
-		query += " suppliers JOIN places USING(ID_place) WHERE 1=1";
+		query = "SELECT * FROM suppliers JOIN places USING(ID_place) WHERE 1=1";
+
 	} else if (inbound.filename == "/tags" || inbound.filename == "/tags/") {
 		type = 3;
-		query += " tags WHERE 1=1";
+		query = "SELECT * FROM tags WHERE 1=1";
+
+	} else {
+		return false;
 	}
 
+	std::cout << "API endpoint = " << inbound.filename << std::endl;
+
 	// create the query
-	// TODO: check for price amount
 	for (auto const& [key, value] : inbound.parameters) {
 
 		switch (type) {
@@ -414,8 +363,6 @@ bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 	case 3:
 		result = getJSONTag(query);
 		break;
-	default:
-		return false;
 	}
 
 	outbound.rawBody = result;
@@ -441,10 +388,10 @@ void composeHeader(const char* filename, std::map<std::string, std::string>& res
 		result["HTTP/1.1"] = "200 OK";
 
 		// get the file extension, i'll use it to get the content type
-		std::string temp = split(filename, ".").back();
+		std::string temp = split(filename, ".").back(); // + ~24 alloc
 
 		// get the content type
-		std::string content_type;
+		std::string content_type = "";
 		getContentType(&temp, content_type);
 
 		// fallback if finds nothing
@@ -466,7 +413,7 @@ void composeHeader(const char* filename, std::map<std::string, std::string>& res
 	result["Date"] = getUTC();
 	result["Connection"] = "close";
 	result["Vary"] = "Accept-Encoding";
-	result["Server"] = "LeonardoCustom/2.1 (Win64)";
+	result["Server"] = "LeonardoCustom/3.0 (Win64)";
 }
 
 /**
@@ -509,7 +456,13 @@ void getContentType(const std::string* filetype, std::string& result) {
 	mtx.lock();
 	res = conn.Query(&query);
 	mtx.unlock();
+
 	// i only get the first result
+	if (res == nullptr) {
+		result = "text/plain";
+		return;
+	}
+
 	if (res->next()) {
 		result = res->getString("content");
 	} else {
@@ -517,7 +470,9 @@ void getContentType(const std::string* filetype, std::string& result) {
 		query = "SELECT * FROM types WHERE type LIKE '%" + *filetype + "'";
 
 		// execute query
+		mtx.lock();
 		res = conn.Query(&query);
+		mtx.unlock();
 
 		// check first result
 		if (res->next()) {

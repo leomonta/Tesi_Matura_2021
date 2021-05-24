@@ -1,36 +1,6 @@
 #include "HTTP_conn.hpp"
 #include "utils.hpp"
 
-/*
-struct MemMan {
-	size_t memAlloc = 0;
-	size_t memDeAlloc = 0;
-
-	void getMemUsage() {
-		std::cout << memAlloc << " - " << memDeAlloc << " -> " << memAlloc - memDeAlloc << std::endl;
-	}
-
-	void resetMemUsage() {
-		memAlloc = 0;
-		memDeAlloc = 0;
-	}
-};
-
-static MemMan watcher;
-
-void* operator new(size_t size) {
-	watcher.memAlloc += size;
-
-	return malloc(size);
-}
-
-void operator delete (void* chunk, size_t size) {
-	watcher.memDeAlloc += size;
-
-	free(chunk);
-}
-*/
-
 
 /**
 * Shortcut to accept any client socket, to be used multiple time by thread

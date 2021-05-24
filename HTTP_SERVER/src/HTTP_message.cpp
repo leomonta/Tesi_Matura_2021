@@ -152,7 +152,7 @@ void HTTP_message::parseQueryParameters(std::string& params) {
 		// key=value
 		temp = split(dst, "=");
 
-		if (temp.size() >= 2) {
+		if (temp.size() >= 2 && temp[1] != "") {
 			parameters[temp[0]] = temp[1];
 		}
 

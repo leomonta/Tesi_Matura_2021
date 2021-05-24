@@ -120,7 +120,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;C:\boost;C:\program Files\MySQL\Connector C++ 8.0\include;C:\Users\Leonardo\Desktop\workspace\libs\libs-c++\zlib-msvc-debug\include;C:\Users\Leonardo\Desktop\workspace\libs\libs-c++\json-cpp-good</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;C:\boost;C:\program Files\MySQL\Connector C++ 8.0\include;C:\Users\Leonardo\Desktop\workspace\libs\libs-c++\zlib-msvc-debug\include;C:\Users\Leonardo\Desktop\workspace\libs\libs-c++\json_nlohmann</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <ExceptionHandling>Async</ExceptionHandling>
@@ -142,7 +142,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;C:\boost;C:\program Files\MySQL\Connector C++ 8.0\include;C:\Users\Leonardo\Desktop\workspace\libs\libs-c++\zlib-msvc-release\include;C:\Users\Leonardo\Desktop\workspace\libs\libs-c++\json-cpp-good</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;C:\boost;C:\program Files\MySQL\Connector C++ 8.0\include;C:\Users\Leonardo\Desktop\workspace\libs\libs-c++\zlib-msvc-release\include;C:\Users\Leonardo\Desktop\workspace\libs\libs-c++\json_nlohmann</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ExceptionHandling>Async</ExceptionHandling>
     </ClCompile>
