@@ -16,6 +16,7 @@ void Database_connection::connect(sql::SQLString* host, sql::SQLString* username
 	try {
 		// enstablish connection
 		connection = driver->connect(*host, *username, *password);
+
 		// use the given database
 		connection->setSchema(*DBName);
 	} catch (sql::SQLException e) {

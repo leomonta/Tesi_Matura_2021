@@ -7,7 +7,7 @@
 #include "HTTP_message.hpp"
 #include "DB_conn.hpp"
 #include "utils.hpp"
-#include "single_include/nlohmann/json.hpp"
+#include "nlohmann/json.hpp"
 
 using json = nlohmann::json;
 
@@ -16,9 +16,6 @@ const char* server_init_file = "C:/Users/Leonardo/Desktop/workspace/vs-c++/TESI_
 #else
 const char* server_init_file = "../server_options.ini";
 #endif
-/**
-* TODO: using ssl to encript trasmission
-*/
 
 // Http Server
 std::string HTTP_Basedir = "/";

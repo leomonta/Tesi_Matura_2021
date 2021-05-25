@@ -5,8 +5,6 @@ VisualStudioVersion = 16.0.31112.23
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HTTP_SERVER", "HTTP_SERVER\HTTP_SERVER.vcxproj", "{106A32AF-54F7-473E-90BA-BE34DBCBA77C}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HTTP_CLIENT", "HTTP_CLIENT\HTTP_CLIENT.vcxproj", "{C48EA827-E20C-4340-8BC1-831CD5CCBB54}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{51B139F0-43BE-4B48-AF4A-0BF29E5ED6F5}"
 	ProjectSection(SolutionItems) = preProject
 		ReadMe.md = ReadMe.md
@@ -29,14 +27,6 @@ Global
 		{106A32AF-54F7-473E-90BA-BE34DBCBA77C}.Release|x64.Build.0 = Release|x64
 		{106A32AF-54F7-473E-90BA-BE34DBCBA77C}.Release|x86.ActiveCfg = Release|Win32
 		{106A32AF-54F7-473E-90BA-BE34DBCBA77C}.Release|x86.Build.0 = Release|Win32
-		{C48EA827-E20C-4340-8BC1-831CD5CCBB54}.Debug|x64.ActiveCfg = Debug|x64
-		{C48EA827-E20C-4340-8BC1-831CD5CCBB54}.Debug|x64.Build.0 = Debug|x64
-		{C48EA827-E20C-4340-8BC1-831CD5CCBB54}.Debug|x86.ActiveCfg = Debug|Win32
-		{C48EA827-E20C-4340-8BC1-831CD5CCBB54}.Debug|x86.Build.0 = Debug|Win32
-		{C48EA827-E20C-4340-8BC1-831CD5CCBB54}.Release|x64.ActiveCfg = Release|x64
-		{C48EA827-E20C-4340-8BC1-831CD5CCBB54}.Release|x64.Build.0 = Release|x64
-		{C48EA827-E20C-4340-8BC1-831CD5CCBB54}.Release|x86.ActiveCfg = Release|Win32
-		{C48EA827-E20C-4340-8BC1-831CD5CCBB54}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

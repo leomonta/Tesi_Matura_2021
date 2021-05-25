@@ -9,7 +9,6 @@
   (and mysql_connection.h). This will reduce build time!
 */
 
-// #define CPPCONN_PUBLIC_FUNC
 #define CPPCONN_LIB_BUILD
 
 #include "jdbc/mysql_connection.h"
