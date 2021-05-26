@@ -11,11 +11,7 @@
 
 using json = nlohmann::json;
 
-#ifdef _DEBUG
-const char* server_init_file = "C:/Users/Leonardo/Desktop/workspace/vs-c++/TESI_MONTAGNER_MATURA/server_options.ini";
-#else
-const char* server_init_file = "../server_options.ini";
-#endif
+const char* server_init_file = "server_options.ini";
 
 // Http Server
 std::string HTTP_Basedir = "/";
@@ -25,8 +21,8 @@ std::string HTTP_Port = "80";
 sql::SQLString DB_Port = "3306";
 sql::SQLString DB_Host = "localhost";
 sql::SQLString DB_Username = "root";
-sql::SQLString DB_Password = "password";
-sql::SQLString DB_Name = "";
+sql::SQLString DB_Password = "";
+sql::SQLString DB_Name = "mb_db";
 
 Database_connection conn;
 
@@ -65,7 +61,7 @@ int __cdecl main() {
 	// create connection
 	sql::SQLString l_host("tcp://" + DB_Host + ":" + DB_Port);
 
-	conn.connect(&l_host, &DB_Username, &DB_Password, &DB_Name);
+	conn.connect(l_host, DB_Username, DB_Password, DB_Name);
 
 	// used for controlling 
 	int iResult;
