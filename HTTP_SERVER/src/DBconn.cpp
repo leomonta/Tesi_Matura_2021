@@ -13,12 +13,9 @@ Database_connection::Database_connection(sql::SQLString& host, sql::SQLString& u
 */
 void Database_connection::connect(sql::SQLString& host, sql::SQLString& username, sql::SQLString& password, sql::SQLString& DBName) {
 
-	sql::Driver* sqlDriver = get_driver_instance();
 	try {
 		// enstablish connection
-		if (driver != nullptr) {
-			connection = sqlDriver->connect(host, username, password);
-		}
+		connection = driver->connect(host, username, password);
 
 		// use the given database
 		connection->setSchema(DBName);

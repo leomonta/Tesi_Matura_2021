@@ -36,59 +36,64 @@
 #include "connection.h"
 #include "build_config.h"
 
-namespace sql {
+namespace sql
+{
 
-	class CPPCONN_PUBLIC_FUNC Driver {
-	protected:
-		virtual ~Driver() {}
-	public:
-		// Attempts to make a database connection to the given URL.
+class CPPCONN_PUBLIC_FUNC Driver
+{
+protected:
+  virtual ~Driver() {}
+public:
+  // Attempts to make a database connection to the given URL.
 
-		virtual Connection* connect(const sql::SQLString& hostName, const sql::SQLString& userName, const sql::SQLString& password) = 0;
+  virtual Connection * connect(const sql::SQLString& hostName, const sql::SQLString& userName, const sql::SQLString& password) = 0;
 
-		virtual Connection* connect(ConnectOptionsMap& options) = 0;
+  virtual Connection * connect(ConnectOptionsMap & options) = 0;
 
-		virtual int getMajorVersion() = 0;
+  virtual int getMajorVersion() = 0;
 
-		virtual int getMinorVersion() = 0;
+  virtual int getMinorVersion() = 0;
 
-		virtual int getPatchVersion() = 0;
+  virtual int getPatchVersion() = 0;
 
-		virtual const sql::SQLString& getName() = 0;
+  virtual const sql::SQLString & getName() = 0;
 
-		virtual void threadInit() = 0;
+  virtual void threadInit() = 0;
 
-		virtual void threadEnd() = 0;
-	};
+  virtual void threadEnd() = 0;
+};
 
 } /* namespace sql */
 
 
-CPPCONN_PUBLIC_FUNC void check(const std::string&);
-CPPCONN_PUBLIC_FUNC void check(const std::map<std::string, std::string>&);
+CPPCONN_PUBLIC_FUNC void check(const std::string &);
+CPPCONN_PUBLIC_FUNC void check(const std::map<std::string,std::string> &);
 
 /*
   Checks if user standard lib is compatible with connector one
 */
-inline static void check_lib() {
-	check(std::string {});
-	check(std::map<std::string, std::string>{});
+inline static void check_lib()
+{
+  check(std::string{});
+  check(std::map<std::string,std::string>{});
 }
 
 extern "C"
 {
 
-	CPPCONN_PUBLIC_FUNC sql::Driver* _get_driver_instance_by_name(const char* const clientlib);
+  CPPCONN_PUBLIC_FUNC sql::Driver * _get_driver_instance_by_name(const char * const clientlib);
 
-	/* If dynamic loading is disabled in a driver then this function works just like get_driver_instance() */
-	inline static sql::Driver* get_driver_instance_by_name(const char* const clientlib) {
-		check_lib();
-		return _get_driver_instance_by_name(clientlib);
-	}
+  /* If dynamic loading is disabled in a driver then this function works just like get_driver_instance() */
+  inline static sql::Driver * get_driver_instance_by_name(const char * const clientlib)
+  {
+    check_lib();
+    return _get_driver_instance_by_name(clientlib);
+  }
 
-	inline static sql::Driver* get_driver_instance() {
-		return get_driver_instance_by_name("");
-	}
+  inline static sql::Driver * get_driver_instance()
+  {
+    return get_driver_instance_by_name("");
+  }
 }
 
 #endif /* _SQL_DRIVER_H_ */
