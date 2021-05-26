@@ -75,8 +75,8 @@ int __cdecl main() {
 		if (client == INVALID_SOCKET) {
 			continue;
 		} else {
-			resolveRequest(client, &http);
-			//std::thread(resolveRequest, client, &http).detach();
+			//resolveRequest(client, &http);
+			std::thread(resolveRequest, client, &http).detach();
 		}
 
 	}
