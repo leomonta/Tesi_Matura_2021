@@ -29,6 +29,10 @@ void Database_connection::connect(sql::SQLString& host, sql::SQLString& username
 */
 sql::ResultSet* Database_connection::Query(sql::SQLString* query) {
 
+	if (connection == nullptr) {
+		return nullptr;
+	}
+
 	sql::ResultSet* res = nullptr;
 
 	try {
