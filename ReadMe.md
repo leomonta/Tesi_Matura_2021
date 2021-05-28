@@ -19,7 +19,7 @@ each product and supplier are invented and have randomly generated data.
 * API entries: _host_/
 	* products/?
 		* ID=_number_		the exact numeric value of the product id, it returns a single product
-		* tag=_string_		the exact tag string of the searched product, there can be multiple tags differentiated by a comme: tecnology, gaming, cpu
+		* tag=_string_		the exact tag string of the searched product, there can be only be on tag
 		* search=_string_	a string containing part of the desired product name and options
 		* results=_number_	number of maximum results that will be returned if nothing provided return only one result
 		* supplier=_string_	a string containing part of the supplier name
