@@ -339,7 +339,7 @@ bool manageApi(HTTP_message& inbound, HTTP_message& outbound) {
 	if (inbound.parameters["results"] >= "0") {
 		query += " LIMIT " + inbound.parameters["results"];
 	} else {
-		query += "LIMIT 1";
+		query += " LIMIT 1";
 	}
 
 	std::cout << query << std::endl;

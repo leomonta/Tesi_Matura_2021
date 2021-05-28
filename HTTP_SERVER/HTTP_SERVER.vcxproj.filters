@@ -50,5 +50,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="res\Databases.sql" />
+    <None Include="server_options.ini" />
   </ItemGroup>
 </Project>
